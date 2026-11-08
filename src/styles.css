@@ -655,3 +655,119 @@ details.carte summary {
     margin-bottom: 2rem;
   }
 }
+
+/* ---------- Lecture du texte (v2) ---------- */
+
+.guide {
+  background: var(--surface);
+  border: 1px solid var(--bordure);
+  border-radius: var(--rayon);
+  padding: 0.8rem 0.9rem;
+  margin: 0.6rem 0 0.8rem;
+  font-size: 0.95rem;
+}
+.guide ol {
+  margin: 0.4rem 0 0.4rem;
+  padding-left: 1.2rem;
+}
+.guide li {
+  margin: 0.25rem 0;
+}
+.guide small {
+  color: var(--texte-doux);
+}
+.icone-scan {
+  width: 1.25em;
+  height: 1.25em;
+  vertical-align: -0.25em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  padding: 1px;
+  border: 1px solid var(--bordure);
+  border-radius: 5px;
+  background: var(--fond);
+}
+.note {
+  background: var(--gris-fond);
+  border-radius: 10px;
+  padding: 0.6rem 0.8rem;
+  font-size: 0.95rem;
+  margin: 0.8rem 0;
+}
+.avertissement {
+  margin: 0.8rem 0;
+}
+.texte-lu {
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.9;
+  font-size: 0.95rem;
+  margin: 0.4rem 0 0;
+}
+.texte-lu .neutre {
+  color: var(--texte-doux);
+}
+.surligne {
+  font: inherit;
+  line-height: inherit;
+  display: inline;
+  padding: 0.1rem 0.25rem;
+  margin: 0;
+  border: 0;
+  border-radius: 5px;
+  cursor: pointer;
+  color: var(--texte);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+.surligne.reconnu {
+  background: var(--vert-fond);
+  box-shadow: inset 0 -2px 0 var(--vert);
+}
+.surligne.pfas {
+  background: var(--rouge);
+  color: var(--surface);
+  font-weight: 700;
+}
+.surligne.possible {
+  background: var(--orange-fond);
+  box-shadow: inset 0 -2px 0 var(--orange);
+}
+.surligne.exclu {
+  background: var(--bleu-fond);
+  color: var(--bleu);
+}
+.surligne.bruit {
+  background: none;
+  color: var(--texte-doux);
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  padding: 0;
+}
+.legende {
+  font-size: 0.8rem;
+  color: var(--texte-doux);
+  line-height: 2;
+  margin: 0;
+}
+.legende .surligne {
+  cursor: default;
+  font-size: 0.8rem;
+}
+.ing.reconnu {
+  background: var(--vert-fond);
+  border-color: transparent;
+}
+.badge.reconnu {
+  background: var(--vert-fond);
+  color: var(--vert);
+}
+.cite {
+  font-style: italic;
+  background: var(--fond);
+  border-radius: 8px;
+  padding: 0.5rem 0.7rem;
+}

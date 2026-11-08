@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'preact/hooks'
-import type { IngredientAnalyse, Resultat } from './engine/analyse.ts'
+import type { IngredientAnalyse, Morceau, Resultat } from './engine/analyse.ts'
 import { estPfas } from './engine/rules.ts'
 import { chargerDetails, chargerExplications, chargerRessources, type Explications, type Produit } from './donnees.ts'
 import { T, traduireFonctions } from './textes.ts'
@@ -8,8 +8,8 @@ const LIBELLE_SOURCE: Record<Resultat['source'], string> = {
   base_beaute: 'Open Beauty Facts',
   base_alimentaire: 'Open Food Facts',
   base_produits: 'Open Products Facts',
-  photo: 'photo de l’étiquette, lue sur le téléphone',
-  texte: 'texte saisi',
+  photo: 'photo de l’étiquette, lue par l’appli',
+  texte: 'texte lu ou saisi sur le téléphone',
 }
 
 function classeIngredient(i: IngredientAnalyse): string {
@@ -17,7 +17,7 @@ function classeIngredient(i: IngredientAnalyse): string {
   if (i.classement.niveau === 'possible') return 'possible'
   if (i.classement.niveau === 'exclu') return 'exclu'
   if (!i.reconnu) return 'inconnu'
-  return ''
+  return 'reconnu'
 }
 
 interface Infos {
@@ -26,17 +26,23 @@ interface Infos {
   entrees: [string, string, string, string][]
 }
 
+type Cible =
+  | { type: 'ingredient'; ing: IngredientAnalyse; lu?: string; morceau?: Morceau }
+  | { type: 'bruit'; lu: string }
+  | { type: 'general' }
+
 export function EcranResultat(props: {
   resultat: Resultat
   produit?: Produit
   onAutre: () => void
   onCorriger: () => void
+  onLireListe: () => void
   onSources: () => void
 }) {
   const { resultat: r, produit } = props
   const [expl, setExpl] = useState<Explications | null>(null)
   const [infos, setInfos] = useState<Infos | null>(null)
-  const [fiche, setFiche] = useState<IngredientAnalyse | 'general' | null>(null)
+  const [fiche, setFiche] = useState<Cible | null>(null)
 
   useEffect(() => {
     chargerExplications().then(setExpl).catch(() => {})
@@ -46,9 +52,11 @@ export function EcranResultat(props: {
   }, [])
 
   const depuisBase = r.source.startsWith('base_')
-  const cosmetique = r.source === 'base_beaute' || ((r.source === 'photo' || r.source === 'texte') && r.tauxReconnus >= 0.5)
+  const cosmetique = !r.aliment && (r.source === 'base_beaute' || r.partComprise >= 0.5)
+  const reconnus = r.ingredients.filter((i) => i.reconnu || i.classement.niveau !== 'aucun')
   const signales = r.ingredients.filter((i) => i.classement.niveau !== 'aucun')
-  const nbReconnus = r.ingredients.filter((i) => i.reconnu).length
+  const nbBruits = r.morceaux.filter((m) => m.type === 'bruit').length
+  const aDuTexte = r.morceaux.length > 0
 
   return (
     <div class="ecran resultat">
@@ -70,33 +78,49 @@ export function EcranResultat(props: {
             {r.titre}
           </h1>
           <p class="phrase">{r.phrase}</p>
-          <p class="confiance">
-            {T.resultat.confiance} : {r.confiance}
-            {r.ingredients.length > 0 && ` · ${nbReconnus} ingrédient${nbReconnus > 1 ? 's' : ''} reconnu${nbReconnus > 1 ? 's' : ''} sur ${r.ingredients.length}`}
-          </p>
+          {aDuTexte && (
+            <p class="confiance">
+              {T.resultat.confiance} : {r.confiance} · {reconnus.length} ingrédient{reconnus.length > 1 ? 's' : ''} reconnu
+              {reconnus.length > 1 ? 's' : ''}
+              {!r.aliment && ` · ${Math.round(r.partComprise * 100)} % du texte compris`}
+            </p>
+          )}
           {r.verdict !== 'vert' && (
-            <button class="lien" onClick={() => setFiche('general')}>
+            <button class="lien" onClick={() => setFiche({ type: 'general' })}>
               {T.resultat.qu_est_ce}
             </button>
           )}
         </section>
 
+        {r.avertissement && <p class="avertissement">{r.avertissement}</p>}
+        {r.aliment && expl && <p class="note">{expl.aliment}</p>}
         {r.verdict === 'rouge' && cosmetique && expl && <p class="reglementaire">{expl.reglementaire.texte}</p>}
-
         {produit && !produit.ingredients && <p class="aide">{T.resultat.sansComposition}</p>}
 
-        {r.ingredients.length > 0 && (
+        {aDuTexte && (
+          <section class="carte">
+            <h2>{T.resultat.texteLu}</h2>
+            <Legende bruits={nbBruits > 0 && !r.aliment} />
+            <p class="texte-lu">
+              <TexteSurligne
+                resultat={r}
+                onIngredient={(ing, lu, morceau) => setFiche({ type: 'ingredient', ing, lu, morceau })}
+                onBruit={(lu) => setFiche({ type: 'bruit', lu })}
+              />
+            </p>
+          </section>
+        )}
+
+        {reconnus.length > 0 && (
           <section class="carte">
             <h2>
-              {T.resultat.ingredients} ({r.ingredients.length})
+              {T.resultat.ingredients} ({reconnus.length})
             </h2>
-            <p class="aide">{T.resultat.legende}</p>
             <ul class="ingredients">
-              {r.ingredients.map((i, n) => (
+              {reconnus.map((i, n) => (
                 <li key={n}>
-                  <button class={`ing ${classeIngredient(i)}`} onClick={() => setFiche(i)}>
+                  <button class={`ing ${classeIngredient(i)}`} onClick={() => setFiche({ type: 'ingredient', ing: i })}>
                     {i.nom}
-                    {!i.reconnu && <span class="etiquette"> · {T.resultat.nonReconnu}</span>}
                   </button>
                 </li>
               ))}
@@ -111,17 +135,21 @@ export function EcranResultat(props: {
               Composition : {LIBELLE_SOURCE[r.source]}
               {produit && depuisBase && ` (code ${produit.code})`}.
             </li>
-            {r.ingredients.length > 0 && (
-              <li>
-                Ingrédients reconnus dans CosIng : {nbReconnus} sur {r.ingredients.length} ({Math.round(r.tauxReconnus * 100)} %).
-              </li>
-            )}
+            <li>
+              L’appli cherche chaque nom d’ingrédient connu partout dans le texte, mot par mot, en tolérant une à trois
+              lettres fausses selon la longueur du nom. Elle reconnaît aussi les numéros CAS et quelques noms commerciaux.
+            </li>
             {signales.map((i, n) => (
               <li key={n}>
                 <strong>{i.nom}</strong> : {i.classement.regle}
                 {i.correction && ` (lu « ${i.brut} »)`}.
               </li>
             ))}
+            {nbBruits > 0 && !r.aliment && (
+              <li>
+                {nbBruits} morceau{nbBruits > 1 ? 'x' : ''} de texte non compris : ni ingrédient connu, ni racine fluorée.
+              </li>
+            )}
             {r.categorieARisque && <li>Catégorie à risque : {r.categorieARisque}.</li>}
             {infos && (
               <li>
@@ -152,9 +180,9 @@ export function EcranResultat(props: {
           {T.boutons.autreProduit}
         </button>
         {depuisBase ? (
-          <label for="entree-photo" class="bouton secondaire">
-            {T.boutons.photoIngredients}
-          </label>
+          <button class="bouton secondaire" onClick={props.onLireListe}>
+            {T.boutons.lireListe}
+          </button>
         ) : (
           <button class="bouton secondaire" onClick={props.onCorriger}>
             {T.boutons.corriger}
@@ -163,35 +191,72 @@ export function EcranResultat(props: {
       </footer>
 
       {fiche && expl && (
-        <Fiche
-          cible={fiche}
-          expl={expl}
-          infos={infos}
-          onGeneral={() => setFiche('general')}
-          onFermer={() => setFiche(null)}
-        />
+        <Fiche cible={fiche} expl={expl} infos={infos} onGeneral={() => setFiche({ type: 'general' })} onFermer={() => setFiche(null)} />
       )}
     </div>
   )
 }
 
-function Fiche(props: {
-  cible: IngredientAnalyse | 'general'
-  expl: Explications
-  infos: Infos | null
-  onGeneral: () => void
-  onFermer: () => void
+function Legende(props: { bruits: boolean }) {
+  return (
+    <p class="legende">
+      <span class="surligne reconnu">reconnu</span> <span class="surligne pfas">PFAS</span>{' '}
+      <span class="surligne exclu">fluoré non PFAS</span>
+      {props.bruits && (
+        <>
+          {' '}
+          <span class="surligne bruit">non compris</span>
+        </>
+      )}
+      <br />
+      {T.resultat.legende}
+    </p>
+  )
+}
+
+function TexteSurligne(props: {
+  resultat: Resultat
+  onIngredient: (ing: IngredientAnalyse, lu: string, morceau: Morceau) => void
+  onBruit: (lu: string) => void
 }) {
+  const { texte, morceaux, ingredients, aliment } = props.resultat
+  const parts = []
+  let pos = 0
+  morceaux.forEach((m, n) => {
+    if (m.debut > pos) parts.push(texte.slice(pos, m.debut))
+    const lu = texte.slice(m.debut, m.fin)
+    // Des <span> et non des <button> : un bouton forme un bloc et casse le fil du texte
+    if (m.type === 'ingredient' && m.ingredient !== undefined) {
+      const ing = ingredients[m.ingredient]
+      parts.push(
+        <span key={n} role="button" tabIndex={0} class={`surligne ${classeIngredient(ing)}`} onClick={() => props.onIngredient(ing, lu, m)}>
+          {lu}
+        </span>,
+      )
+    } else if (m.type === 'bruit' && !aliment) {
+      parts.push(
+        <span key={n} role="button" tabIndex={0} class="surligne bruit" onClick={() => props.onBruit(lu)}>
+          {lu}
+        </span>,
+      )
+    } else parts.push(<span key={n} class="neutre">{lu}</span>)
+    pos = m.fin
+  })
+  if (pos < texte.length) parts.push(texte.slice(pos))
+  return <>{parts}</>
+}
+
+function Fiche(props: { cible: Cible; expl: Explications; infos: Infos | null; onGeneral: () => void; onFermer: () => void }) {
   const { cible, expl } = props
   const [details, setDetails] = useState<{ description: string; restriction: string } | null>(null)
 
   useEffect(() => {
     setDetails(null)
-    if (cible !== 'general' && cible.index !== undefined) chargerDetails(cible.nom).then(setDetails)
+    if (cible.type === 'ingredient' && cible.ing.index !== undefined) chargerDetails(cible.ing.nom).then(setDetails)
   }, [cible])
 
   let corps
-  if (cible === 'general') {
+  if (cible.type === 'general') {
     const g = expl.general
     corps = (
       <>
@@ -210,14 +275,36 @@ function Fiche(props: {
         </p>
       </>
     )
-  } else {
-    const n = cible.classement.niveau
-    const fam = estPfas(n) ? expl.familles[cible.classement.famille ?? 'autre'] : null
-    const entree = cible.index !== undefined ? props.infos?.entrees[cible.index] : undefined
+  } else if (cible.type === 'bruit') {
     corps = (
       <>
-        <h2>{cible.nom}</h2>
-        {cible.correction && <p class="aide">{T.fiche.corrige.replace('{brut}', cible.brut)}</p>}
+        <h2>{T.fiche.nonCompris}</h2>
+        <p class="cite">« {cible.lu} »</p>
+        <p>{T.fiche.nonComprisTexte}</p>
+      </>
+    )
+  } else {
+    const ing = cible.ing
+    const lu = cible.lu ?? ing.brut
+    // L'écart vaut pour le morceau touché (un même ingrédient peut être lu juste à un endroit, avec des fautes ailleurs)
+    const correction = cible.morceau ? cible.morceau.correction : ing.correction
+    const distance = cible.morceau ? cible.morceau.distance : ing.distance
+    const n = ing.classement.niveau
+    const fam = estPfas(n) ? expl.familles[ing.classement.famille ?? 'autre'] : null
+    const entree = ing.index !== undefined ? props.infos?.entrees[ing.index] : undefined
+    corps = (
+      <>
+        <h2>{ing.nom}</h2>
+        {ing.reconnu && lu.trim().toUpperCase() !== ing.nom.toUpperCase() && (
+          <p class="aide">
+            Lu « {lu} »
+            {correction === 'approx' && distance
+              ? `, rapproché de ce nom officiel (${distance} lettre${distance > 1 ? 's' : ''} d’écart).`
+              : correction === 'ocr'
+                ? ', des chiffres lus à la place de lettres ont été corrigés.'
+                : ', reconnu sous ce nom officiel.'}
+          </p>
+        )}
         {fam && (
           <>
             <p class="badge pfas">Famille des PFAS · {fam.titre}</p>
@@ -241,13 +328,14 @@ function Fiche(props: {
             <p>{expl.exclu.texte}</p>
           </>
         )}
-        {cible.classement.regle && (
+        {n === 'aucun' && ing.reconnu && <p class="badge reconnu">{T.fiche.pasPfas}</p>}
+        {ing.classement.regle && (
           <>
             <h3>{T.fiche.filtre}</h3>
-            <p>{cible.classement.regle}.</p>
+            <p>{ing.classement.regle}.</p>
           </>
         )}
-        {!cible.reconnu && <p class="avertissement">{T.fiche.nonReconnu}</p>}
+        {!ing.reconnu && <p class="avertissement">{T.fiche.nonReconnu}</p>}
         {entree?.[3] && (
           <>
             <h3>{T.fiche.fonctions}</h3>

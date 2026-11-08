@@ -27,4 +27,13 @@ Web app mobile (PWA) qui dit si un produit contient probablement des PFAS, à pa
 - Hébergement : GitHub Pages (gratuit, adresse fixe, dépôt public). Pas de tunnel Cloudflare.
 - CosIng n'a pas d'export direct sur le portail de l'UE : la liste vient de la base d'ingrédients d'Open Beauty Facts, qui reprend CosIng (22 228 noms). Quelques noms INCI courants y manquent (Hydroxyethylcellulose, Acacia Senegal Gum) : un export CosIng complet améliorerait la reconnaissance.
 - Le fluor sur un cycle aromatique (fluorophényle…) et les gaz sans carbone entièrement fluoré (HFC-152a, HCFC-22, HCFC-142b) ne déclenchent pas d'alerte rouge : ils ne sont pas des PFAS selon l'OCDE.
-- Étapes 1 à 3 du cahier des charges faites. Restent : listes EPA (4), test de structure PubChem + RDKit (5), historique, alertes secondaires (6).
+- Étapes 1 à 3 du cahier des charges faites.
+
+## Décisions prises après le premier essai sur iPhone (08/11/2026)
+
+- La lecture des étiquettes passe par le scanner de texte de l'iPhone (« Scanner du texte », Live Text) dans la zone de texte de l'appli ; la photo lue par Tesseract reste en secours (Android). Pas de lecture par IA payante.
+- L'analyse ne dépend plus des virgules : `src/engine/lecture.ts` cherche les noms connus partout dans le texte, par groupes de 1 à 8 mots, avec tolérance aux fautes, numéros CAS et noms commerciaux (`scripts/alias.json` : IR3535, DEET, icaridine, macrogol, povidone iodée…).
+- Le résultat montre le texte surligné : reconnu, PFAS, fluoré non PFAS, non compris. Un tap explique chaque morceau.
+- Verdict « vert avec réserve » : vert dès qu'un ingrédient est reconnu sans signal PFAS, avec la part de texte comprise et une mise en garde si le texte ne ressemble pas à une liste d'ingrédients. Gris seulement si rien n'est reconnu. Les racines fluorées sont cherchées aussi dans les morceaux non compris.
+- Un texte d'aliment (tableau nutritionnel) est signalé : les PFAS n'y figurent jamais dans la liste d'ingrédients.
+- Photos de test réelles dans `photos-test/` (non publiées). Restent : listes EPA (4), test de structure PubChem + RDKit (5), historique, alertes secondaires (6).

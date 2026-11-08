@@ -17,6 +17,7 @@ export class Dictionnaire {
   readonly entrees: EntreeInci[]
   private exact = new Map<string, number>()
   private parLongueur = new Map<number, [string, number][]>()
+  private cas = new Map<string, number>()
 
   constructor(entrees: EntreeInci[], noms_supplementaires: string[] = []) {
     this.entrees = [...entrees]
@@ -28,7 +29,14 @@ export class Dictionnaire {
     this.entrees.forEach((e, i) => this.ajouter(compact(e[0]), i))
     this.entrees.forEach((e, i) => {
       if (e[1]) for (const autre of e[1].split('|')) this.ajouter(compact(autre), i)
+      for (const c of e[2].match(/\d{2,7}-\d{2}-\d/g) ?? []) if (!this.cas.has(c)) this.cas.set(c, i)
     })
+  }
+
+  /** Ingrédient désigné par son numéro CAS (« 52304-36-6 »). */
+  parCas(numero: string): Trouve | undefined {
+    const i = this.cas.get(numero)
+    return i === undefined ? undefined : { index: i, nom: this.entrees[i][0], mode: 'exact', distance: 0 }
   }
 
   private ajouter(cle: string, i: number) {
@@ -42,7 +50,11 @@ export class Dictionnaire {
 
   /** Cherche un nom. Renvoie undefined si rien d'assez proche. */
   chercher(nom: string, tolerance = true): Trouve | undefined {
-    const cle = compact(nom)
+    return this.chercherCle(compact(nom), tolerance)
+  }
+
+  /** Même chose à partir d'une clé déjà compactée. */
+  chercherCle(cle: string, tolerance = true): Trouve | undefined {
     if (cle.length < 2) return undefined
     const i = this.exact.get(cle)
     if (i !== undefined) return { index: i, nom: this.entrees[i][0], mode: 'exact', distance: 0 }

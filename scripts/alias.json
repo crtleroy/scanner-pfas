@@ -1,0 +1,18 @@
+{
+  "_note": "Noms commerciaux, pharmaceutiques ou français → nom INCI. Une cible absente de CosIng crée une nouvelle entrée. Les équivalences macrogol → PEG sont approchées (masse moléculaire moyenne).",
+  "ETHYL BUTYLACETYLAMINOPROPIONATE": ["IR3535", "IR 3535"],
+  "DIETHYL TOLUAMIDE": ["DEET", "N,N-diéthyl-m-toluamide", "diéthyltoluamide"],
+  "HYDROXYETHYL ISOBUTYL PIPERIDINE CARBOXYLATE": ["icaridine", "icaridin", "picaridine", "picaridin", "KBR 3023", "saltidin"],
+  "P-MENTHANE-3,8-DIOL": ["PMD", "citriodiol", "para-menthane-3,8-diol"],
+  "POVIDONE-IODINE": ["povidone iodée", "povidone iodine", "polyvidone iodée", "PVP-iode", "PVP-iodine"],
+  "AQUA": ["eau purifiée", "eau déminéralisée", "purified water"],
+  "PEG-6": ["macrogol 300"],
+  "PEG-8": ["macrogol 400"],
+  "PEG-32": ["macrogol 1500"],
+  "PEG-75": ["macrogol 3350"],
+  "PEG-90": ["macrogol 4000"],
+  "PEG-150": ["macrogol 6000"],
+  "GLYCERIN": ["glycérol", "glycerol"],
+  "PETROLATUM": ["vaseline", "vaseline blanche"],
+  "PARAFFINUM LIQUIDUM": ["paraffine liquide", "huile de paraffine"]
+}

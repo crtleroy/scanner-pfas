@@ -138,6 +138,7 @@ export interface Explications {
   exclu: { titre: string; texte: string }
   possible: { titre: string; texte: string }
   reglementaire: { texte: string; source: Lien }
+  aliment: string
   mention: string
   limites: string
 }

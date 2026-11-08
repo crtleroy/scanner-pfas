@@ -107,19 +107,17 @@ export function App() {
   let contenu
   switch (ecran.nom) {
     case 'scan':
-      contenu = <EcranScan surCode={surCode} onSaisir={() => vers({ nom: 'saisie' })} onSources={() => vers({ nom: 'sources' })} />
-      break
-    case 'saisie':
       contenu = (
-        <EcranSaisie
-          onCode={surCode}
-          onTexte={(t) => {
-            setProduit(undefined)
-            analyser(t, 'texte')
-          }}
-          onRetour={accueil}
+        <EcranScan
+          surCode={surCode}
+          onLireListe={() => vers({ nom: 'texte', texte: '', source: 'texte' })}
+          onSaisir={() => vers({ nom: 'saisie' })}
+          onSources={() => vers({ nom: 'sources' })}
         />
       )
+      break
+    case 'saisie':
+      contenu = <EcranSaisie onCode={surCode} onRetour={accueil} />
       break
     case 'chargement':
       contenu = <EcranAttente message={ecran.message} />
@@ -141,11 +139,8 @@ export function App() {
             )}
           </div>
           <footer class="actions">
-            <label for="entree-photo" class="bouton principal">
-              {T.boutons.photoIngredients}
-            </label>
-            <button class="bouton secondaire" onClick={() => vers({ nom: 'saisie' })}>
-              {T.boutons.saisir}
+            <button class="bouton principal" onClick={() => vers({ nom: 'texte', texte: '', source: 'texte' })}>
+              {T.boutons.lireListe}
             </button>
             <button class="bouton discret" onClick={accueil}>
               {T.boutons.retour}
@@ -161,6 +156,7 @@ export function App() {
       contenu = (
         <EcranTexte
           texte={ecran.texte}
+          photo={ecran.source === 'photo'}
           onAnalyser={(t) => analyser(t, ecran.source, produit)}
           onRetour={accueil}
         />
@@ -173,6 +169,7 @@ export function App() {
           produit={produit}
           onAutre={accueil}
           onCorriger={() => vers({ nom: 'texte', texte: ecran.texte ?? '', source: ecran.resultat.source === 'photo' ? 'photo' : 'texte' })}
+          onLireListe={() => vers({ nom: 'texte', texte: '', source: 'texte' })}
           onSources={() => vers({ nom: 'sources' })}
         />
       )
@@ -205,7 +202,7 @@ export function App() {
   )
 }
 
-function EcranScan(props: { surCode: (c: string) => void; onSaisir: () => void; onSources: () => void }) {
+function EcranScan(props: { surCode: (c: string) => void; onLireListe: () => void; onSaisir: () => void; onSources: () => void }) {
   const video = useRef<HTMLVideoElement>(null)
   const [etat, setEtat] = useState<'demarrage' | 'actif' | 'lu' | 'refus' | 'indisponible'>('demarrage')
   const [message, setMessage] = useState('')
@@ -288,11 +285,11 @@ function EcranScan(props: { surCode: (c: string) => void; onSaisir: () => void; 
             {T.scan.photoCode}
           </label>
         )}
-        <label for="entree-photo" class={`bouton ${sansCamera ? 'secondaire' : 'principal'}`}>
-          {T.boutons.photoIngredients}
-        </label>
+        <button class={`bouton ${sansCamera ? 'secondaire' : 'principal'}`} onClick={props.onLireListe}>
+          {T.boutons.lireListe}
+        </button>
         <button class="bouton secondaire" onClick={props.onSaisir}>
-          {T.boutons.saisir}
+          {T.boutons.saisirCode}
         </button>
       </footer>
       <input id="entree-photo-code" type="file" accept="image/*" capture="environment" class="cache" onChange={surPhotoCode} />
@@ -300,9 +297,8 @@ function EcranScan(props: { surCode: (c: string) => void; onSaisir: () => void; 
   )
 }
 
-function EcranSaisie(props: { onCode: (c: string) => void; onTexte: (t: string) => void; onRetour: () => void }) {
+function EcranSaisie(props: { onCode: (c: string) => void; onRetour: () => void }) {
   const [code, setCode] = useState('')
-  const [texte, setTexte] = useState('')
   const [cleFausse, setCleFausse] = useState(false)
 
   function chercher(e: Event) {
@@ -346,21 +342,8 @@ function EcranSaisie(props: { onCode: (c: string) => void; onTexte: (t: string) 
             </p>
           )}
         </form>
-        <div class="champ">
-          <label for="texte">{T.saisie.texte}</label>
-          <textarea
-            id="texte"
-            rows={7}
-            placeholder={T.saisie.texteAide}
-            value={texte}
-            onInput={(e) => setTexte((e.currentTarget as HTMLTextAreaElement).value)}
-          />
-        </div>
       </div>
       <footer class="actions">
-        <button class="bouton principal" disabled={!texte.trim()} onClick={() => props.onTexte(texte)}>
-          {T.boutons.analyser}
-        </button>
         <button class="bouton discret" onClick={props.onRetour}>
           {T.boutons.retour}
         </button>
@@ -369,21 +352,61 @@ function EcranSaisie(props: { onCode: (c: string) => void; onTexte: (t: string) 
   )
 }
 
-function EcranTexte(props: { texte: string; onAnalyser: (t: string) => void; onRetour: () => void }) {
+// « ?ios » dans l'adresse force le guide iPhone (pour le vérifier depuis un PC)
+const IOS =
+  /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ||
+  new URLSearchParams(location.search).has('ios')
+
+/** Icône « Scanner du texte » d'iOS : des lignes de texte dans un cadre à coins. */
+function IconeScanTexte() {
+  return (
+    <svg class="icone-scan" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3" />
+      <path d="M7 9h10M7 12h10M7 15h6" />
+    </svg>
+  )
+}
+
+function EcranTexte(props: { texte: string; photo: boolean; onAnalyser: (t: string) => void; onRetour: () => void }) {
   const [texte, setTexte] = useState(props.texte)
+  const guide = !texte.trim()
   return (
     <div class="ecran">
       <div class="defilement">
-        <h1>{T.texte.titre}</h1>
-        {props.texte ? <p class="aide">{T.texte.aide}</p> : <p class="avertissement">{T.texte.vide}</p>}
-        <textarea class="texte-ocr" value={texte} onInput={(e) => setTexte((e.currentTarget as HTMLTextAreaElement).value)} />
+        <h1>{props.photo ? T.texte.titrePhoto : T.texte.titre}</h1>
+        {props.photo && !props.texte && <p class="avertissement">{T.texte.vide}</p>}
+        {guide && IOS && (
+          <div class="guide">
+            <strong>{T.texte.iosTitre}</strong>
+            <ol>
+              <li>{T.texte.ios1}</li>
+              <li>
+                {T.texte.ios2} <IconeScanTexte /> {T.texte.ios2bis}
+              </li>
+              <li>{T.texte.ios3}</li>
+            </ol>
+            <small>{T.texte.iosNote}</small>
+          </div>
+        )}
+        {guide && !IOS && <p class="guide">{T.texte.android}</p>}
+        {!guide && <p class="aide">{T.texte.aide}</p>}
+        <textarea
+          class="texte-ocr"
+          placeholder={T.texte.placeholder}
+          autoCapitalize="off"
+          autoCorrect="off"
+          spellcheck={false}
+          value={texte}
+          onInput={(e) => setTexte((e.currentTarget as HTMLTextAreaElement).value)}
+        />
       </div>
       <footer class="actions">
         <button class="bouton principal" disabled={!texte.trim()} onClick={() => props.onAnalyser(texte)}>
           {T.boutons.analyser}
         </button>
         <label for="entree-photo" class="bouton secondaire">
-          {T.boutons.reprendre}
+          {props.photo ? T.boutons.reprendre : T.boutons.photoAppli}
         </label>
         <button class="bouton discret" onClick={props.onRetour}>
           {T.boutons.retour}

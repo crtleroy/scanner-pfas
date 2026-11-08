@@ -69,6 +69,7 @@
     "texte": "Les PFAS sont interdits dans les cosmétiques vendus en France depuis le 1er janvier 2026 (loi n° 2025-188 du 27 février 2025). Ce produit a donc été fabriqué avant 2026, importé, ou n'est pas conforme.",
     "source": { "nom": "Ministère de la Transition écologique : loi du 27 février 2025", "url": "https://www.ecologie.gouv.fr/politiques-publiques/proteger-population-risques-lies-aux-pfas-loi-du-27-fevrier-2025" }
   },
+  "aliment": "Dans les aliments, les PFAS ne figurent jamais dans la liste d'ingrédients : ils viennent de la contamination de l'environnement (eau, sols) et de certains emballages résistants à la graisse. Cette lecture ne peut donc pas les voir.",
   "mention": "Estimation à partir de la composition déclarée. Seule une analyse en laboratoire peut mesurer la présence réelle de PFAS.",
   "limites": "L'appli lit une étiquette, elle n'analyse pas le produit. Elle ne voit pas la contamination involontaire (eau de fabrication, emballage), les traitements non déclarés, ni ce qui manque dans les bases collaboratives."
 }

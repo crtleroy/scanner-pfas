@@ -30,6 +30,8 @@ if (!existsSync(brut) || process.argv.includes('--refresh')) {
 type Valeurs = Record<string, string>
 interface EntreeObf {
   name?: Valeurs
+  'inn-name'?: Valeurs
+  'ph-eur-name'?: Valeurs
   cas?: Valeurs
   inci_functions?: Valeurs
   inci_description?: Valeurs
@@ -60,6 +62,13 @@ for (const e of Object.values(base)) {
     if (langue === 'en' || !v) continue
     if (compact(v) !== cle) autres.add(v.trim())
   }
+  // Noms de pharmacopée (DCI, Ph. Eur.) : « macrogol 200 », « natrii chloridum »…
+  for (const champ of [e['inn-name']?.en, e['ph-eur-name']?.en]) {
+    for (const v of (champ ?? '').split(';')) {
+      const propre = v.replace(/\[[^\]]*\]/g, '').trim()
+      if (propre && compact(propre) !== cle) autres.add(propre)
+    }
+  }
   const cas = (e.cas?.en ?? '').trim()
   const fonctions = (e.inci_functions?.en ?? '')
     .split(',')
@@ -82,6 +91,18 @@ for (const e of Object.values(base)) {
     // aromatique ou un fluor isolé, sans CF2 ni CF3.
     nonPfas.push({ n: nom, r: 'fluor sur un cycle aromatique ou isolé, sans CF2 ni CF3' })
   else if (cl.niveau === 'exclu') nonPfas.push({ n: nom, r: cl.regle.replace(/^Fluoré mais pas un PFAS : /, '') })
+}
+
+// Noms commerciaux, pharmaceutiques et français (scripts/alias.json)
+const alias: Record<string, string[] | string> = JSON.parse(readFileSync(join(racine, 'scripts', 'alias.json'), 'utf8'))
+for (const [cible, noms] of Object.entries(alias)) {
+  if (cible.startsWith('_') || !Array.isArray(noms)) continue
+  const entree = inci.find((x) => compact(x[0]) === compact(cible))
+  if (entree) entree[1] = [...new Set([...entree[1].split('|').filter(Boolean), ...noms])].join('|')
+  else {
+    inci.push([cible, noms.join('|'), '', ''])
+    console.log(`Alias : « ${cible} » absent de CosIng, entrée ajoutée`)
+  }
 }
 
 // Ajouts manuels : noms courants absents de CosIng ou écrits autrement sur les emballages.

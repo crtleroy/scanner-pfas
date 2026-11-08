@@ -1,7 +1,9 @@
 // Moteur d'analyse : fonction pure, testée à part de l'interface.
-import { classer, compact, estPfas, plusGrave, type Classement, type Famille, type ListesPfas } from './rules.ts'
-import { decouper, variantes } from './texte.ts'
-import type { Dictionnaire, Trouve } from './dictionnaire.ts'
+import { compact, estPfas, type Famille, type ListesPfas } from './rules.ts'
+import { lire, type IngredientAnalyse, type Morceau } from './lecture.ts'
+import type { Dictionnaire } from './dictionnaire.ts'
+
+export type { IngredientAnalyse, Morceau } from './lecture.ts'
 
 export type Source = 'base_beaute' | 'base_alimentaire' | 'base_produits' | 'photo' | 'texte'
 export type Verdict = 'rouge' | 'orange' | 'vert' | 'gris'
@@ -18,63 +20,32 @@ export interface Ressources {
   listes: ListesPfas
 }
 
-export interface IngredientAnalyse {
-  /** Texte tel que lu sur l'étiquette ou dans la base */
-  brut: string
-  /** Nom INCI si reconnu, sinon le texte nettoyé */
-  nom: string
-  reconnu: boolean
-  correction?: Trouve['mode']
-  index?: number
-  classement: Classement
-}
-
 export interface Resultat {
   verdict: Verdict
   titre: string
   phrase: string
   confiance: Confiance
+  /** Ingrédients trouvés, sans doublon (un même ingrédient lu deux fois n'apparaît qu'une fois) */
   ingredients: IngredientAnalyse[]
-  /** Part des ingrédients reconnus dans le dictionnaire, de 0 à 1 */
-  tauxReconnus: number
+  /** Texte analysé et découpage pour l'affichage surligné */
+  texte: string
+  morceaux: Morceau[]
+  /** Part du texte utile qui correspond à un ingrédient, de 0 à 1 */
+  partComprise: number
+  /** Texte d'aliment (tableau nutritionnel, base Open Food Facts) */
+  aliment: boolean
+  /** Mise en garde à afficher sous le verdict */
+  avertissement?: string
   categorieARisque?: string
   familles: Famille[]
   source: Source
 }
 
-/** Analyse une liste d'ingrédients (texte brut ou déjà découpée). */
+/** Analyse un texte d'étiquette ou une liste d'ingrédients. */
 export function analyse(entree: string | string[], contexte: Contexte, r: Ressources): Resultat {
-  const morceaux = typeof entree === 'string' ? decouper(entree) : entree.flatMap((x) => decouper(x))
-  const ingredients = morceaux.map((m) => analyserIngredient(m, r))
-  return conclure(ingredients, contexte)
-}
-
-export function analyserIngredient(brut: string, r: Ressources): IngredientAnalyse {
-  const vs = variantes(brut)
-  let trouve: Trouve | undefined
-  // D'abord une correspondance exacte sur l'une des variantes, ensuite seulement l'approximation
-  for (const v of vs) {
-    trouve = r.dictionnaire.chercher(v, false)
-    if (trouve) break
-  }
-  if (!trouve) trouve = r.dictionnaire.chercher(vs[0]) ?? (vs[1] ? r.dictionnaire.chercher(vs[1]) : undefined)
-
-  let classement: Classement = { niveau: 'aucun', regle: '' }
-  if (trouve) classement = classer(trouve.nom, r.listes)
-  // Le texte brut compte aussi : un nom fluoré mal rapproché ne doit pas disparaître.
-  // Sauf si le nom reconnu est un fluoré non PFAS connu (le texte brut contient alors les mêmes racines).
-  if (classement.niveau !== 'exclu') {
-    for (const v of vs) classement = plusGrave(classement, classer(v, r.listes))
-  }
-  const reconnu = !!trouve || classement.niveau !== 'aucun'
-  return {
-    brut,
-    nom: trouve ? trouve.nom : brut,
-    reconnu,
-    ...(trouve && trouve.mode !== 'exact' ? { correction: trouve.mode } : {}),
-    ...(trouve ? { index: trouve.index } : {}),
-    classement,
-  }
+  const texte = typeof entree === 'string' ? entree : entree.join(', ')
+  const lecture = lire(texte, r)
+  return conclure(texte, lecture.ingredients, lecture.morceaux, lecture.partComprise, contexte)
 }
 
 // Catégories où l'on trouve des PFAS quand la composition manque (cahier des charges).
@@ -93,27 +64,41 @@ export function categorieARisque(categories: string[] = [], nomProduit = ''): st
   return undefined
 }
 
+/** Un tableau nutritionnel signale un aliment. */
+export function estTexteAliment(texte: string): boolean {
+  const t = texte.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+  const indices = [/valeurs? nutritionnelles?/, /\bkcal\b|\d\s*kcal/, /\bglucides\b/, /\bproteines\b/, /matieres grasses/, /nutrition facts/, /\bsucres\b/]
+  return indices.filter((r) => r.test(t)).length >= 2
+}
+
 function pluriel(n: number, mot: string): string {
   return `${n} ${mot}${n > 1 ? 's' : ''}`
 }
 
-export function conclure(ingredients: IngredientAnalyse[], contexte: Contexte): Resultat {
+export function conclure(
+  texte: string,
+  ingredients: IngredientAnalyse[],
+  morceaux: Morceau[],
+  partComprise: number,
+  contexte: Contexte,
+): Resultat {
   const source = contexte.source
-  const base = { ingredients, source }
+  const aliment = source === 'base_alimentaire' || source === 'base_produits' || estTexteAliment(texte)
+  const base = { ingredients, texte, morceaux, partComprise, aliment, source }
   const familles = [...new Set(ingredients.flatMap((i) => (estPfas(i.classement.niveau) && i.classement.famille ? [i.classement.famille] : [])))]
-  const nbReconnus = ingredients.filter((i) => i.reconnu).length
-  const tauxReconnus = ingredients.length ? nbReconnus / ingredients.length : 0
+  const textePresent = /[\p{L}]{2}/u.test(texte)
 
-  if (ingredients.length === 0) {
+  if (!textePresent) {
+    if (source === 'photo' || source === 'texte')
+      return { ...base, verdict: 'gris', titre: 'Indéterminé', phrase: 'Aucun texte à analyser.', confiance: 'faible', familles }
     const risque = categorieARisque(contexte.categories, contexte.nomProduit)
     if (risque)
       return {
         ...base,
         verdict: 'orange',
         titre: 'À vérifier',
-        phrase: `Composition inconnue. Ce type de produit (${risque}) contient parfois des PFAS : photographiez la liste des ingrédients.`,
+        phrase: `Composition inconnue. Ce type de produit (${risque}) contient parfois des PFAS : lisez la liste des ingrédients.`,
         confiance: 'faible',
-        tauxReconnus,
         categorieARisque: risque,
         familles,
       }
@@ -121,9 +106,8 @@ export function conclure(ingredients: IngredientAnalyse[], contexte: Contexte): 
       ...base,
       verdict: 'gris',
       titre: 'Indéterminé',
-      phrase: 'Composition inconnue : photographiez la liste des ingrédients au dos du produit.',
+      phrase: 'La base ne connaît pas la composition de ce produit : lisez la liste des ingrédients au dos.',
       confiance: 'faible',
-      tauxReconnus,
       familles,
     }
   }
@@ -137,7 +121,6 @@ export function conclure(ingredients: IngredientAnalyse[], contexte: Contexte): 
       titre: 'PFAS détecté',
       phrase: `${pluriel(pfas.length, 'ingrédient')} de la famille des PFAS`,
       confiance: parListe ? 'élevée' : 'moyenne',
-      tauxReconnus,
       familles,
     }
   }
@@ -150,35 +133,50 @@ export function conclure(ingredients: IngredientAnalyse[], contexte: Contexte): 
       titre: 'PFAS possible',
       phrase: `${pluriel(possibles.length, 'ingrédient')} fluoré${possibles.length > 1 ? 's' : ''} à vérifier`,
       confiance: 'faible',
-      tauxReconnus,
       familles,
     }
   }
 
-  // Pour les produits alimentaires et divers, les ingrédients ne sont pas des noms INCI :
-  // le taux de reconnaissance ne veut rien dire.
-  const tauxCompte = source === 'photo' || source === 'texte' || source === 'base_beaute'
-  if (tauxCompte && tauxReconnus < (source === 'base_beaute' ? 0.4 : 0.6)) {
+  const reconnus = ingredients.filter((i) => i.reconnu).length
+
+  // Aliments : les PFAS n'y sont jamais déclarés comme ingrédients, et les noms ne sont pas des noms INCI
+  if (aliment) {
+    return {
+      ...base,
+      verdict: 'vert',
+      titre: 'Aucun PFAS détecté',
+      phrase: 'Aucun PFAS dans la liste d’ingrédients.',
+      confiance: 'moyenne',
+      familles,
+    }
+  }
+
+  if (reconnus === 0) {
     return {
       ...base,
       verdict: 'gris',
       titre: 'Indéterminé',
-      phrase: `Seuls ${Math.round(tauxReconnus * 100)} % des ingrédients sont reconnus : corrigez le texte ou reprenez la photo.`,
+      phrase: 'Rien dans ce texte ne correspond à un ingrédient connu. Vérifiez que c’est bien la liste d’ingrédients, ou corrigez le texte.',
       confiance: 'faible',
-      tauxReconnus,
       familles,
     }
   }
 
-  let confiance: Confiance = 'moyenne'
-  if (tauxCompte) confiance = tauxReconnus >= 0.9 ? 'élevée' : tauxReconnus >= 0.7 ? 'moyenne' : 'faible'
+  const complet = partComprise >= 0.85
+  const confiance: Confiance = complet ? 'élevée' : partComprise >= 0.5 ? 'moyenne' : 'faible'
+  const marqueur = /ingr[eé]dien|composition|\binci\b|excipient|zutaten/i.test(texte)
+  let avertissement: string | undefined
+  if (partComprise < 0.3)
+    avertissement = 'La plus grande partie du texte n’a pas été comprise : ce n’est peut-être pas la liste d’ingrédients.'
+  else if (!marqueur && reconnus <= 3 && partComprise < 0.6)
+    avertissement = 'Ce texte ne ressemble pas à une liste d’ingrédients : pas de mention « Ingrédients » ou « Composition », et peu d’ingrédients reconnus.'
   return {
     ...base,
     verdict: 'vert',
     titre: 'Aucun PFAS détecté',
-    phrase: 'Aucun PFAS dans la composition déclarée.',
+    phrase: complet ? 'Aucun PFAS dans la composition déclarée.' : 'Aucun PFAS dans ce qui a été lu.',
     confiance,
-    tauxReconnus,
+    ...(avertissement ? { avertissement } : {}),
     familles,
   }
 }
