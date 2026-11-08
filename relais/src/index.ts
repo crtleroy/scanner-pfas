@@ -116,6 +116,7 @@ export default {
           },
         ],
       })
+      console.log(`lecture : ${message.stop_reason}, ${message.usage.input_tokens} jetons entrée, ${message.usage.output_tokens} sortie`)
       if (message.stop_reason === 'refusal') return reponse({ erreur: 'refus' }, 422, cors)
       if (message.stop_reason === 'max_tokens' || !message.parsed_output) return reponse({ erreur: 'lecture' }, 502, cors)
       return reponse(
@@ -128,6 +129,8 @@ export default {
         cors,
       )
     } catch (e) {
+      // Journal visible avec « wrangler tail » (jamais la clé ni l'image)
+      console.error('erreur Claude :', e instanceof Anthropic.APIError ? `${e.status} ${e.message}` : String(e))
       if (e instanceof Anthropic.RateLimitError) return reponse({ erreur: 'limite' }, 429, cors)
       if (e instanceof Anthropic.AuthenticationError) return reponse({ erreur: 'cle' }, 500, cors)
       if (e instanceof Anthropic.APIError) return reponse({ erreur: 'claude', statut: e.status ?? null }, 502, cors)
