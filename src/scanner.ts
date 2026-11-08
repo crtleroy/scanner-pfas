@@ -2,6 +2,7 @@
 import { BarcodeDetector as BarcodeDetectorZxing, prepareZXingModule } from 'barcode-detector/ponyfill'
 import wasmUrl from 'zxing-wasm/reader/zxing_reader.wasm?url'
 import { normaliserCode } from './codes.ts'
+import { preparerImage } from './relais.ts'
 
 const FORMATS = ['ean_13', 'ean_8', 'upc_a', 'upc_e'] as const
 
@@ -50,13 +51,16 @@ export async function lireCode(source: CanvasImageSource | ImageBitmap): Promise
 
 export interface Camera {
   arreter(): void
+  /** Image actuelle de la caméra, prête à envoyer (JPEG, 1568 px au plus) */
+  capturer(): Promise<Blob>
 }
 
 /**
  * Démarre la caméra arrière dans `video` et lit en continu la zone centrale.
- * Appelle `surCode` quand le même code a été lu deux fois de suite.
+ * Appelle `surCode` quand le même code a été lu deux fois de suite ; s'il renvoie false, la lecture continue
+ * (par exemple pour ignorer le code du produit dont on photographie la liste).
  */
-export async function demarrerCamera(video: HTMLVideoElement, surCode: (code: string) => void): Promise<Camera> {
+export async function demarrerCamera(video: HTMLVideoElement, surCode: (code: string) => boolean | void): Promise<Camera> {
   const flux = await navigator.mediaDevices.getUserMedia({
     video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
     audio: false,
@@ -101,9 +105,11 @@ export async function demarrerCamera(video: HTMLVideoElement, surCode: (code: st
           }
         }
         if (lu && lu === precedent) {
-          actif = false
-          surCode(lu)
-          return
+          if (surCode(lu) !== false) {
+            actif = false
+            return
+          }
+          lu = ''
         }
         precedent = lu
       }
@@ -119,6 +125,9 @@ export async function demarrerCamera(video: HTMLVideoElement, surCode: (code: st
       actif = false
       for (const p of flux.getTracks()) p.stop()
       video.srcObject = null
+    },
+    capturer() {
+      return preparerImage(video, video.videoWidth, video.videoHeight)
     },
   }
 }

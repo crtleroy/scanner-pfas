@@ -37,3 +37,11 @@ Web app mobile (PWA) qui dit si un produit contient probablement des PFAS, à pa
 - Verdict « vert avec réserve » : vert dès qu'un ingrédient est reconnu sans signal PFAS, avec la part de texte comprise et une mise en garde si le texte ne ressemble pas à une liste d'ingrédients. Gris seulement si rien n'est reconnu. Les racines fluorées sont cherchées aussi dans les morceaux non compris.
 - Un texte d'aliment (tableau nutritionnel) est signalé : les PFAS n'y figurent jamais dans la liste d'ingrédients.
 - Photos de test réelles dans `photos-test/` (non publiées). Restent : listes EPA (4), test de structure PubChem + RDKit (5), historique, alertes secondaires (6).
+
+## Lecture des étiquettes par Claude (décidé le 08/11/2026, soir)
+
+- Tesseract et le scanner de texte de l'iPhone ont été jugés insuffisants ou malcommodes. L'écran caméra a un bouton « Lire l'étiquette » qui prend l'image de la caméra et l'envoie au relais `relais/` (Cloudflare Worker), qui la fait lire par **Claude Haiku 5.5** (environ 0,05 centime par photo).
+- Claude recopie la liste (nom lu, nom normalisé, quantité, commentaire) dans un format imposé ; **le verdict PFAS reste calculé par nos règles** (`src/engine/ia.ts`), jamais par Claude.
+- Résultat en tableau Ingrédient | Quantité | Commentaire.
+- Le relais exige un code d'accès (secret `CODE_ACCES`) et garde la clé Anthropic (secret `ANTHROPIC_API_KEY`). En local : `relais/.dev.vars` avec `MODE=factice` pour une réponse simulée, et `.env.local` avec `VITE_RELAIS_URL=http://127.0.0.1:8787`. `?demo-ia` (développement seulement) affiche un résultat de démonstration.
+- La lecture sur le téléphone (Tesseract) reste en secours hors ligne.

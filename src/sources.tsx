@@ -62,8 +62,9 @@ export function EcranSources(props: { onRetour: () => void }) {
         </ul>
         <h2>Vie privée</h2>
         <p>
-          Seul le code-barres est envoyé aux bases Open Facts. Les photos sont lues sur le téléphone (Tesseract.js) et ne
-          quittent pas l’appareil. Aucun compte, aucune publicité.
+          Le code-barres est envoyé aux bases Open Facts. Une photo d’étiquette, quand vous touchez « Lire l’étiquette »,
+          est envoyée à Anthropic (Claude Haiku 5.5) par un relais Cloudflare, seulement pour être lue. La lecture de
+          secours « sur le téléphone » (Tesseract.js) ne fait rien sortir de l’appareil. Aucun compte, aucune publicité.
         </p>
         {expl && (
           <>

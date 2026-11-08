@@ -5,7 +5,8 @@ import type { Dictionnaire } from './dictionnaire.ts'
 
 export type { IngredientAnalyse, Morceau } from './lecture.ts'
 
-export type Source = 'base_beaute' | 'base_alimentaire' | 'base_produits' | 'photo' | 'texte'
+/** 'ia' : photo lue par Claude via le relais ; 'photo' : photo lue par Tesseract dans le téléphone */
+export type Source = 'base_beaute' | 'base_alimentaire' | 'base_produits' | 'photo' | 'texte' | 'ia'
 export type Verdict = 'rouge' | 'orange' | 'vert' | 'gris'
 export type Confiance = 'élevée' | 'moyenne' | 'faible'
 
@@ -36,6 +37,8 @@ export interface Resultat {
   aliment: boolean
   /** Mise en garde à afficher sous le verdict */
   avertissement?: string
+  /** Remarque de Claude sur la photo (liste dans une autre langue…) */
+  remarque?: string
   categorieARisque?: string
   familles: Famille[]
   source: Source

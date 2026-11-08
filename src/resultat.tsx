@@ -8,8 +8,9 @@ const LIBELLE_SOURCE: Record<Resultat['source'], string> = {
   base_beaute: 'Open Beauty Facts',
   base_alimentaire: 'Open Food Facts',
   base_produits: 'Open Products Facts',
-  photo: 'photo de l’étiquette, lue par l’appli',
-  texte: 'texte lu ou saisi sur le téléphone',
+  photo: 'photo de l’étiquette, lue sur le téléphone (Tesseract)',
+  texte: 'texte saisi ou collé',
+  ia: 'photo de l’étiquette, lue par Claude Haiku 5.5 (Anthropic)',
 }
 
 function classeIngredient(i: IngredientAnalyse): string {
@@ -34,9 +35,11 @@ type Cible =
 export function EcranResultat(props: {
   resultat: Resultat
   produit?: Produit
+  /** Nom du produit lu sur la photo par Claude */
+  nomLu?: string
   onAutre: () => void
   onCorriger: () => void
-  onLireListe: () => void
+  onLireEtiquette: () => void
   onSources: () => void
 }) {
   const { resultat: r, produit } = props
@@ -51,17 +54,38 @@ export function EcranResultat(props: {
       .catch(() => {})
   }, [])
 
+  const ia = r.source === 'ia'
   const depuisBase = r.source.startsWith('base_')
   const cosmetique = !r.aliment && (r.source === 'base_beaute' || r.partComprise >= 0.5)
-  const reconnus = r.ingredients.filter((i) => i.reconnu || i.classement.niveau !== 'aucun')
+  const lignes = r.ingredients.filter((i) => i.reconnu || i.classement.niveau !== 'aucun')
   const signales = r.ingredients.filter((i) => i.classement.niveau !== 'aucun')
   const nbBruits = r.morceaux.filter((m) => m.type === 'bruit').length
-  const aDuTexte = r.morceaux.length > 0
+  const aDuTexte = r.texte.trim().length > 0
+
+  /** Commentaire d'une ligne : l'état PFAS d'abord (nos règles), puis ce qu'est l'ingrédient */
+  function commentaire(i: IngredientAnalyse) {
+    const n = i.classement.niveau
+    let etat = null
+    if (estPfas(n))
+      etat = <span class="etat pfas">PFAS · {expl?.familles[i.classement.famille ?? 'autre']?.titre ?? 'famille des PFAS'}</span>
+    else if (n === 'possible') etat = <span class="etat possible">Fluoré, à vérifier</span>
+    else if (n === 'exclu') etat = <span class="etat exclu">Contient du fluor, pas un PFAS</span>
+    else if (!i.reconnu) etat = <span class="etat inconnu">Non reconnu</span>
+    const fonctions = i.index !== undefined ? infos?.entrees[i.index]?.[3] : undefined
+    const texte = i.commentaire ?? (fonctions ? traduireFonctions(fonctions) : '')
+    return (
+      <>
+        {etat}
+        {etat && texte && <br />}
+        {texte}
+      </>
+    )
+  }
 
   return (
     <div class="ecran resultat">
       <div class="defilement">
-        {produit && (
+        {produit ? (
           <div class="produit">
             {produit.image && <img src={produit.image} alt="" />}
             <div>
@@ -70,6 +94,14 @@ export function EcranResultat(props: {
               <small>Code {produit.code}</small>
             </div>
           </div>
+        ) : (
+          props.nomLu && (
+            <div class="produit">
+              <div>
+                <strong>{props.nomLu}</strong>
+              </div>
+            </div>
+          )
         )}
 
         <section class={`verdict ${r.verdict}`} aria-live="polite">
@@ -78,11 +110,10 @@ export function EcranResultat(props: {
             {r.titre}
           </h1>
           <p class="phrase">{r.phrase}</p>
-          {aDuTexte && (
+          {lignes.length > 0 && (
             <p class="confiance">
-              {T.resultat.confiance} : {r.confiance} · {reconnus.length} ingrédient{reconnus.length > 1 ? 's' : ''} reconnu
-              {reconnus.length > 1 ? 's' : ''}
-              {!r.aliment && ` · ${Math.round(r.partComprise * 100)} % du texte compris`}
+              {T.resultat.confiance} : {r.confiance} · {lignes.length} ingrédient{lignes.length > 1 ? 's' : ''}
+              {!r.aliment && !ia && ` · ${Math.round(r.partComprise * 100)} % du texte compris`}
             </p>
           )}
           {r.verdict !== 'vert' && (
@@ -93,39 +124,59 @@ export function EcranResultat(props: {
         </section>
 
         {r.avertissement && <p class="avertissement">{r.avertissement}</p>}
+        {r.remarque && <p class="note">{r.remarque}</p>}
         {r.aliment && expl && <p class="note">{expl.aliment}</p>}
         {r.verdict === 'rouge' && cosmetique && expl && <p class="reglementaire">{expl.reglementaire.texte}</p>}
-        {produit && !produit.ingredients && <p class="aide">{T.resultat.sansComposition}</p>}
+        {produit && !produit.ingredients && !ia && <p class="aide">{T.resultat.sansComposition}</p>}
 
-        {aDuTexte && (
-          <section class="carte">
-            <h2>{T.resultat.texteLu}</h2>
-            <Legende bruits={nbBruits > 0 && !r.aliment} />
-            <p class="texte-lu">
-              <TexteSurligne
-                resultat={r}
-                onIngredient={(ing, lu, morceau) => setFiche({ type: 'ingredient', ing, lu, morceau })}
-                onBruit={(lu) => setFiche({ type: 'bruit', lu })}
-              />
-            </p>
+        {lignes.length > 0 && (
+          <section class="carte tableau-carte">
+            <h2>
+              {T.resultat.ingredients} ({lignes.length})
+            </h2>
+            <table class="tableau-ing">
+              <thead>
+                <tr>
+                  <th>{T.resultat.colIngredient}</th>
+                  <th>{T.resultat.colQuantite}</th>
+                  <th>{T.resultat.colCommentaire}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lignes.map((i, n) => (
+                  <tr key={n} class={classeIngredient(i)} onClick={() => setFiche({ type: 'ingredient', ing: i })}>
+                    <td class="nom">
+                      {i.nom}
+                      {ia && i.brut.trim().toLowerCase() !== i.nom.trim().toLowerCase() && <small>lu : {i.brut}</small>}
+                    </td>
+                    <td class="qte">{i.quantite ?? '—'}</td>
+                    <td class="com">{commentaire(i)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p class="aide">{T.resultat.toucherLigne}</p>
           </section>
         )}
 
-        {reconnus.length > 0 && (
-          <section class="carte">
-            <h2>
-              {T.resultat.ingredients} ({reconnus.length})
-            </h2>
-            <ul class="ingredients">
-              {reconnus.map((i, n) => (
-                <li key={n}>
-                  <button class={`ing ${classeIngredient(i)}`} onClick={() => setFiche({ type: 'ingredient', ing: i })}>
-                    {i.nom}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </section>
+        {aDuTexte && (
+          <details class="carte" open={r.verdict === 'gris'}>
+            <summary>{ia ? T.resultat.texteLuIA : T.resultat.texteLu}</summary>
+            {ia ? (
+              <p class="texte-lu">{r.texte}</p>
+            ) : (
+              <>
+                <Legende bruits={nbBruits > 0 && !r.aliment} />
+                <p class="texte-lu">
+                  <TexteSurligne
+                    resultat={r}
+                    onIngredient={(ing, lu, morceau) => setFiche({ type: 'ingredient', ing, lu, morceau })}
+                    onBruit={(lu) => setFiche({ type: 'bruit', lu })}
+                  />
+                </p>
+              </>
+            )}
+          </details>
         )}
 
         <details class="carte">
@@ -135,10 +186,17 @@ export function EcranResultat(props: {
               Composition : {LIBELLE_SOURCE[r.source]}
               {produit && depuisBase && ` (code ${produit.code})`}.
             </li>
-            <li>
-              L’appli cherche chaque nom d’ingrédient connu partout dans le texte, mot par mot, en tolérant une à trois
-              lettres fausses selon la longueur du nom. Elle reconnaît aussi les numéros CAS et quelques noms commerciaux.
-            </li>
+            {ia ? (
+              <li>
+                Claude a recopié la liste d’ingrédients et rédigé les commentaires. Le verdict PFAS ne vient pas de Claude :
+                l’appli vérifie chaque nom dans ses propres listes (CosIng et définition OCDE 2021).
+              </li>
+            ) : (
+              <li>
+                L’appli cherche chaque nom d’ingrédient connu partout dans le texte, mot par mot, en tolérant une à trois
+                lettres fausses selon la longueur du nom. Elle reconnaît aussi les numéros CAS et quelques noms commerciaux.
+              </li>
+            )}
             {signales.map((i, n) => (
               <li key={n}>
                 <strong>{i.nom}</strong> : {i.classement.regle}
@@ -179,9 +237,13 @@ export function EcranResultat(props: {
         <button class="bouton principal" onClick={props.onAutre}>
           {T.boutons.autreProduit}
         </button>
-        {depuisBase ? (
-          <button class="bouton secondaire" onClick={props.onLireListe}>
-            {T.boutons.lireListe}
+        {ia ? (
+          <button class="bouton secondaire" onClick={props.onLireEtiquette}>
+            {T.boutons.reprendre}
+          </button>
+        ) : depuisBase ? (
+          <button class="bouton secondaire" onClick={props.onLireEtiquette}>
+            {T.boutons.lireEtiquette}
           </button>
         ) : (
           <button class="bouton secondaire" onClick={props.onCorriger}>
@@ -252,7 +314,8 @@ function Fiche(props: { cible: Cible; expl: Explications; infos: Infos | null; o
 
   useEffect(() => {
     setDetails(null)
-    if (cible.type === 'ingredient' && cible.ing.index !== undefined) chargerDetails(cible.ing.nom).then(setDetails)
+    if (cible.type === 'ingredient' && cible.ing.index !== undefined)
+      chargerDetails(props.infos?.entrees[cible.ing.index]?.[0] ?? cible.ing.nom).then(setDetails)
   }, [cible])
 
   let corps
@@ -295,6 +358,8 @@ function Fiche(props: { cible: Cible; expl: Explications; infos: Infos | null; o
     corps = (
       <>
         <h2>{ing.nom}</h2>
+        {ing.commentaire && <p>{ing.commentaire}</p>}
+        {ing.quantite && <p class="aide">Quantité : {ing.quantite}</p>}
         {ing.reconnu && lu.trim().toUpperCase() !== ing.nom.toUpperCase() && (
           <p class="aide">
             Lu « {lu} »
@@ -302,7 +367,7 @@ function Fiche(props: { cible: Cible; expl: Explications; infos: Infos | null; o
               ? `, rapproché de ce nom officiel (${distance} lettre${distance > 1 ? 's' : ''} d’écart).`
               : correction === 'ocr'
                 ? ', des chiffres lus à la place de lettres ont été corrigés.'
-                : ', reconnu sous ce nom officiel.'}
+                : ', reconnu sous ce nom.'}
           </p>
         )}
         {fam && (

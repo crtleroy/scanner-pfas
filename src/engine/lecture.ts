@@ -14,6 +14,10 @@ export interface IngredientAnalyse {
   distance?: number
   index?: number
   classement: Classement
+  /** Quantité écrite à côté de l'ingrédient (« 35 % »), quand on la connaît */
+  quantite?: string
+  /** Commentaire court sur l'ingrédient (lecture par Claude) */
+  commentaire?: string
 }
 
 export type TypeMorceau = 'ingredient' | 'bruit' | 'neutre'

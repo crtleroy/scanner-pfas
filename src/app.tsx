@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'preact/hooks'
 import { analyse, type Resultat, type Source } from './engine/analyse.ts'
+import { analyseIA } from './engine/ia.ts'
 import { chargerRessources, chercherProduit, type Produit } from './donnees.ts'
 import { normaliserCode } from './codes.ts'
 import { bip, debloquerSon, demarrerCamera, lireCode, type Camera } from './scanner.ts'
 import { lireTexte, prechargerOcr, pretraiter, type Cadre } from './ocr.ts'
+import { codeAcces, enregistrerCode, ErreurRelais, lireEtiquette, preparerImage } from './relais.ts'
 import { T } from './textes.ts'
 import { Recadrage } from './recadrage.tsx'
 import { EcranResultat } from './resultat.tsx'
@@ -14,14 +16,17 @@ type Ecran =
   | { nom: 'saisie' }
   | { nom: 'chargement'; message: string }
   | { nom: 'introuvable'; code: string; erreurs: string[] }
+  | { nom: 'lecture-ia'; apercu: string }
+  | { nom: 'code'; image?: Blob; erreur?: boolean }
+  | { nom: 'erreur-ia'; message: string; image: Blob }
   | { nom: 'recadrage'; image: HTMLImageElement }
   | { nom: 'lecture'; progression: number; etape: string }
   | { nom: 'texte'; texte: string; source: 'photo' | 'texte' }
-  | { nom: 'resultat'; resultat: Resultat; texte?: string }
+  | { nom: 'resultat'; resultat: Resultat; texte?: string; nomLu?: string }
   | { nom: 'sources' }
   | { nom: 'erreur'; message: string }
 
-async function chargerImage(fichier: File): Promise<HTMLImageElement> {
+async function chargerImage(fichier: Blob): Promise<HTMLImageElement> {
   const img = new Image()
   img.src = URL.createObjectURL(fichier)
   await img.decode()
@@ -30,20 +35,56 @@ async function chargerImage(fichier: File): Promise<HTMLImageElement> {
 
 export function App() {
   const [ecran, setEcran] = useState<Ecran>({ nom: 'scan' })
-  // Produit en cours : on le garde quand on passe à la photo des ingrédients
+  // Produit en cours : on le garde quand on photographie ensuite sa liste d'ingrédients
   const [produit, setProduit] = useState<Produit | undefined>()
+  // Consigne affichée sur l'écran caméra (« visez la liste d'ingrédients… ») et code-barres à ignorer
+  const [consigne, setConsigne] = useState<{ texte: string; ignorer?: string } | undefined>()
   const precedent = useRef<Ecran>({ nom: 'scan' })
 
   useEffect(() => {
     // Les listes (≈ 400 Ko compressés) se chargent en fond pour que la première analyse soit immédiate
     const t = setTimeout(() => chargerRessources().catch(() => {}), 1500)
-    const debloquer = () => debloquerSon()
-    window.addEventListener('pointerdown', debloquer, { once: true })
+    window.addEventListener('pointerdown', () => debloquerSon(), { once: true })
+    // En développement seulement : « ?demo-ia » affiche un résultat de lecture par Claude sans photo
+    if (import.meta.env.DEV && location.search.includes('demo-ia')) {
+      chargerRessources().then((r) =>
+        setEcran({
+          nom: 'resultat',
+          nomLu: 'Fond de teint (démonstration)',
+          resultat: analyseIA(
+            {
+              type_produit: 'cosmetique',
+              liste_trouvee: true,
+              lisibilite: 'partielle',
+              nom_produit: 'Fond de teint (démonstration)',
+              remarque: 'Liste en anglais, la fin est cachée par le pouce.',
+              texte_lu: 'AQUA, CYCLOPENTASILOXANE, PTFE, SODIUM FLUORIDE, TRIFLUOROPROPYL DIMETHICONE, PHENOXYETHANOL 0,8 %',
+              ingredients: [
+                { nom_lu: 'Aqua', nom_normalise: 'AQUA', quantite: null, commentaire: 'eau, base du produit' },
+                { nom_lu: 'Cyclopentasiloxane', nom_normalise: 'CYCLOPENTASILOXANE', quantite: null, commentaire: 'silicone volatil, texture légère' },
+                { nom_lu: 'PTFE', nom_normalise: 'PTFE', quantite: null, commentaire: 'poudre de texture glissante' },
+                { nom_lu: 'Sodium Fluoride', nom_normalise: 'SODIUM FLUORIDE', quantite: null, commentaire: 'sel minéral de fluor' },
+                { nom_lu: 'Trifluoropropyl Dimethicone', nom_normalise: 'TRIFLUOROPROPYL DIMETHICONE', quantite: null, commentaire: 'silicone filmogène' },
+                { nom_lu: 'Phenoxyethanol', nom_normalise: 'PHENOXYETHANOL', quantite: '0,8 %', commentaire: 'conservateur' },
+              ],
+            },
+            r,
+          ),
+        }),
+      )
+    }
     return () => clearTimeout(t)
   }, [])
 
   const accueil = () => {
     setProduit(undefined)
+    setConsigne(undefined)
+    setEcran({ nom: 'scan' })
+  }
+
+  /** Retour à la caméra pour photographier la liste d'ingrédients du produit en cours */
+  const versEtiquette = (code?: string) => {
+    setConsigne({ texte: T.scan.consigneListe, ignorer: code ?? produit?.code })
     setEcran({ nom: 'scan' })
   }
 
@@ -60,6 +101,7 @@ export function App() {
 
   async function surCode(code: string) {
     setProduit(undefined)
+    setConsigne(undefined)
     setEcran({ nom: 'chargement', message: T.chargement.bases })
     const { produit: p, erreurs } = await chercherProduit(code)
     if (!p) {
@@ -70,18 +112,61 @@ export function App() {
     await analyser(p.ingredients ?? '', p.base.id, p)
   }
 
-  async function surPhotoIngredients(e: Event) {
+  /** Photo d'étiquette → relais → Claude → nos règles PFAS */
+  async function lireAvecClaude(image: Blob) {
+    if (!codeAcces()) {
+      setEcran({ nom: 'code', image })
+      return
+    }
+    const apercu = URL.createObjectURL(image)
+    setEcran({ nom: 'lecture-ia', apercu })
+    try {
+      const [rep, r] = await Promise.all([lireEtiquette(image), chargerRessources()])
+      setConsigne(undefined)
+      setEcran({ nom: 'resultat', resultat: analyseIA(rep, r), nomLu: rep.nom_produit ?? undefined })
+    } catch (e) {
+      if (e instanceof ErreurRelais && e.type === 'code') {
+        enregistrerCode(null)
+        setEcran({ nom: 'code', image, erreur: true })
+      } else {
+        setEcran({ nom: 'erreur-ia', message: e instanceof ErreurRelais ? e.message : T.ia.erreur, image })
+      }
+    } finally {
+      URL.revokeObjectURL(apercu)
+    }
+  }
+
+  /** Photo prise avec l'appareil photo du téléphone (quand la caméra en direct n'est pas disponible) */
+  async function surPhotoEtiquette(e: Event) {
     const entree = e.currentTarget as HTMLInputElement
     const fichier = entree.files?.[0]
     entree.value = ''
     if (!fichier) return
-    prechargerOcr()
     try {
-      const image = await chargerImage(fichier)
-      setEcran({ nom: 'recadrage', image })
+      const img = await chargerImage(fichier)
+      const image = await preparerImage(img, img.naturalWidth, img.naturalHeight)
+      URL.revokeObjectURL(img.src)
+      lireAvecClaude(image)
     } catch {
       setEcran({ nom: 'erreur', message: 'Impossible d’ouvrir cette photo.' })
     }
+  }
+
+  /** Secours hors ligne : lecture de la photo par Tesseract, dans le téléphone */
+  async function lireSurLeTelephone(image: Blob) {
+    prechargerOcr()
+    try {
+      setEcran({ nom: 'recadrage', image: await chargerImage(image) })
+    } catch {
+      setEcran({ nom: 'erreur', message: 'Impossible d’ouvrir cette photo.' })
+    }
+  }
+
+  async function surPhotoTesseract(e: Event) {
+    const entree = e.currentTarget as HTMLInputElement
+    const fichier = entree.files?.[0]
+    entree.value = ''
+    if (fichier) lireSurLeTelephone(fichier)
   }
 
   async function lire(image: HTMLImageElement, cadre: Cadre) {
@@ -109,21 +194,61 @@ export function App() {
     case 'scan':
       contenu = (
         <EcranScan
+          consigne={consigne?.texte}
+          ignorer={consigne?.ignorer}
           surCode={surCode}
-          onLireListe={() => vers({ nom: 'texte', texte: '', source: 'texte' })}
+          onEtiquette={lireAvecClaude}
+          onOublierConsigne={() => setConsigne(undefined)}
           onSaisir={() => vers({ nom: 'saisie' })}
           onSources={() => vers({ nom: 'sources' })}
         />
       )
       break
     case 'saisie':
-      contenu = <EcranSaisie onCode={surCode} onRetour={accueil} />
+      contenu = <EcranSaisie onCode={surCode} onTexte={() => vers({ nom: 'texte', texte: '', source: 'texte' })} onRetour={accueil} />
       break
     case 'chargement':
       contenu = <EcranAttente message={ecran.message} />
       break
     case 'lecture':
       contenu = <EcranAttente message={ecran.etape} progression={ecran.progression} />
+      break
+    case 'lecture-ia':
+      contenu = <EcranAttente message={T.ia.lecture} apercu={ecran.apercu} />
+      break
+    case 'code':
+      contenu = (
+        <EcranCode
+          erreur={!!ecran.erreur}
+          onValider={(code) => {
+            enregistrerCode(code)
+            if (ecran.image) lireAvecClaude(ecran.image)
+            else accueil()
+          }}
+          onRetour={accueil}
+        />
+      )
+      break
+    case 'erreur-ia':
+      contenu = (
+        <div class="ecran">
+          <div class="defilement">
+            <h1>{T.ia.titreErreur}</h1>
+            <p>{ecran.message}</p>
+          </div>
+          <footer class="actions">
+            <button class="bouton principal" onClick={() => lireAvecClaude(ecran.image)}>
+              {T.boutons.reessayer}
+            </button>
+            <button class="bouton secondaire" onClick={() => lireSurLeTelephone(ecran.image)}>
+              {T.boutons.photoAppli}
+            </button>
+            <button class="bouton discret" onClick={() => setEcran({ nom: 'scan' })}>
+              {T.boutons.retour}
+            </button>
+          </footer>
+        </div>
+      )
       break
     case 'introuvable':
       contenu = (
@@ -139,8 +264,8 @@ export function App() {
             )}
           </div>
           <footer class="actions">
-            <button class="bouton principal" onClick={() => vers({ nom: 'texte', texte: '', source: 'texte' })}>
-              {T.boutons.lireListe}
+            <button class="bouton principal" onClick={() => versEtiquette(ecran.code)}>
+              {T.boutons.lireEtiquette}
             </button>
             <button class="bouton discret" onClick={accueil}>
               {T.boutons.retour}
@@ -167,9 +292,10 @@ export function App() {
         <EcranResultat
           resultat={ecran.resultat}
           produit={produit}
+          nomLu={ecran.nomLu}
           onAutre={accueil}
           onCorriger={() => vers({ nom: 'texte', texte: ecran.texte ?? '', source: ecran.resultat.source === 'photo' ? 'photo' : 'texte' })}
-          onLireListe={() => vers({ nom: 'texte', texte: '', source: 'texte' })}
+          onLireEtiquette={() => versEtiquette()}
           onSources={() => vers({ nom: 'sources' })}
         />
       )
@@ -196,33 +322,49 @@ export function App() {
   return (
     <div class="appli">
       {contenu}
-      <input id="entree-photo" type="file" accept="image/*" capture="environment" class="cache" onChange={surPhotoIngredients} />
-      <input id="entree-galerie" type="file" accept="image/*" class="cache" onChange={surPhotoIngredients} />
+      <input id="entree-etiquette" type="file" accept="image/*" capture="environment" class="cache" onChange={surPhotoEtiquette} />
+      <input id="entree-photo" type="file" accept="image/*" capture="environment" class="cache" onChange={surPhotoTesseract} />
     </div>
   )
 }
 
-function EcranScan(props: { surCode: (c: string) => void; onLireListe: () => void; onSaisir: () => void; onSources: () => void }) {
+function EcranScan(props: {
+  consigne?: string
+  /** Code-barres à ignorer (celui du produit dont on photographie la liste) */
+  ignorer?: string
+  surCode: (c: string) => void
+  onEtiquette: (image: Blob) => void
+  onOublierConsigne: () => void
+  onSaisir: () => void
+  onSources: () => void
+}) {
   const video = useRef<HTMLVideoElement>(null)
+  const camera = useRef<Camera | null>(null)
+  // Toujours les valeurs à jour dans le rappel de la caméra, qui tourne en continu
+  const surCodeActuel = useRef(props.surCode)
+  surCodeActuel.current = props.surCode
+  const ignorerActuel = useRef(props.ignorer)
+  ignorerActuel.current = props.ignorer
   const [etat, setEtat] = useState<'demarrage' | 'actif' | 'lu' | 'refus' | 'indisponible'>('demarrage')
   const [message, setMessage] = useState('')
+  const [capture, setCapture] = useState(false)
 
   useEffect(() => {
-    let camera: Camera | undefined
     let annule = false
     if (!navigator.mediaDevices?.getUserMedia) {
       setEtat('indisponible')
       return
     }
     demarrerCamera(video.current!, (code) => {
+      if (ignorerActuel.current === code) return false
       setEtat('lu')
       bip()
-      setTimeout(() => props.surCode(code), 350)
+      setTimeout(() => surCodeActuel.current(code), 350)
     })
       .then((c) => {
         if (annule) c.arreter()
         else {
-          camera = c
+          camera.current = c
           setEtat((e) => (e === 'lu' ? e : 'actif'))
         }
       })
@@ -231,9 +373,23 @@ function EcranScan(props: { surCode: (c: string) => void; onLireListe: () => voi
       })
     return () => {
       annule = true
-      camera?.arreter()
+      camera.current?.arreter()
+      camera.current = null
     }
   }, [])
+
+  async function declencher() {
+    if (!camera.current || capture) return
+    debloquerSon()
+    setCapture(true)
+    try {
+      const image = await camera.current.capturer()
+      props.onEtiquette(image)
+    } catch {
+      setMessage(T.scan.captureRatee)
+      setCapture(false)
+    }
+  }
 
   async function surPhotoCode(e: Event) {
     const entree = e.currentTarget as HTMLInputElement
@@ -256,7 +412,7 @@ function EcranScan(props: { surCode: (c: string) => void; onLireListe: () => voi
   let texte = message
   if (!texte) {
     if (etat === 'demarrage') texte = T.scan.demarrage
-    else if (etat === 'actif') texte = T.scan.viser
+    else if (etat === 'actif') texte = props.consigne ? '' : T.scan.viser
     else if (etat === 'lu') texte = T.scan.lu
     else if (etat === 'refus') texte = T.scan.refus
     else texte = T.scan.indisponible
@@ -273,23 +429,40 @@ function EcranScan(props: { surCode: (c: string) => void; onLireListe: () => voi
           {T.boutons.sources}
         </button>
       </header>
+      {props.consigne && (
+        <div class="consigne" role="status">
+          <span>{props.consigne}</span>
+          <button class="lien-clair" onClick={props.onOublierConsigne} aria-label="Fermer la consigne">
+            ✕
+          </button>
+        </div>
+      )}
       {!sansCamera && (
         <div class="viseur" aria-hidden="true">
           <div class={`cadre${etat === 'lu' ? ' lu' : ''}`} />
         </div>
       )}
-      <p class={`scan-message${sansCamera ? ' fort' : ''}`} role="status">
-        {texte}
-      </p>
+      {texte && (
+        <p class={`scan-message${sansCamera ? ' fort' : ''}`} role="status">
+          {texte}
+        </p>
+      )}
       <footer class="actions sombre">
-        {sansCamera && (
-          <label for="entree-photo-code" class="bouton principal">
-            {T.scan.photoCode}
-          </label>
+        {sansCamera ? (
+          <>
+            <label for="entree-etiquette" class="bouton principal">
+              {T.boutons.photoEtiquette}
+            </label>
+            <label for="entree-photo-code" class="bouton secondaire">
+              {T.scan.photoCode}
+            </label>
+          </>
+        ) : (
+          <button class="bouton principal declencheur" disabled={etat !== 'actif' || capture} onClick={declencher}>
+            <span class="pastille-photo" aria-hidden="true" />
+            {capture ? T.scan.capture : T.boutons.lireEtiquette}
+          </button>
         )}
-        <button class={`bouton ${sansCamera ? 'secondaire' : 'principal'}`} onClick={props.onLireListe}>
-          {T.boutons.lireListe}
-        </button>
         <button class="bouton secondaire" onClick={props.onSaisir}>
           {T.boutons.saisirCode}
         </button>
@@ -299,7 +472,7 @@ function EcranScan(props: { surCode: (c: string) => void; onLireListe: () => voi
   )
 }
 
-function EcranSaisie(props: { onCode: (c: string) => void; onRetour: () => void }) {
+function EcranSaisie(props: { onCode: (c: string) => void; onTexte: () => void; onRetour: () => void }) {
   const [code, setCode] = useState('')
   const [cleFausse, setCleFausse] = useState(false)
 
@@ -344,6 +517,9 @@ function EcranSaisie(props: { onCode: (c: string) => void; onRetour: () => void 
             </p>
           )}
         </form>
+        <button class="lien" onClick={props.onTexte}>
+          {T.saisie.collerTexte}
+        </button>
       </div>
       <footer class="actions">
         <button class="bouton discret" onClick={props.onRetour}>
@@ -354,45 +530,53 @@ function EcranSaisie(props: { onCode: (c: string) => void; onRetour: () => void 
   )
 }
 
-// « ?ios » dans l'adresse force le guide iPhone (pour le vérifier depuis un PC)
-const IOS =
-  /iPhone|iPad|iPod/.test(navigator.userAgent) ||
-  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ||
-  new URLSearchParams(location.search).has('ios')
-
-/** Icône « Scanner du texte » d'iOS : des lignes de texte dans un cadre à coins. */
-function IconeScanTexte() {
+function EcranCode(props: { erreur: boolean; onValider: (code: string) => void; onRetour: () => void }) {
+  const [code, setCode] = useState('')
   return (
-    <svg class="icone-scan" viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3" />
-      <path d="M7 9h10M7 12h10M7 15h6" />
-    </svg>
+    <div class="ecran">
+      <div class="defilement">
+        <h1>{T.code.titre}</h1>
+        <p>{T.code.texte}</p>
+        {props.erreur && <p class="avertissement">{T.code.erreur}</p>}
+        <form
+          class="champ"
+          onSubmit={(e) => {
+            e.preventDefault()
+            if (code.trim()) props.onValider(code)
+          }}
+        >
+          <label for="code-acces">{T.code.libelle}</label>
+          <input
+            id="code-acces"
+            autoComplete="off"
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellcheck={false}
+            value={code}
+            onInput={(e) => setCode((e.currentTarget as HTMLInputElement).value)}
+          />
+        </form>
+      </div>
+      <footer class="actions">
+        <button class="bouton principal" disabled={!code.trim()} onClick={() => props.onValider(code)}>
+          {T.boutons.valider}
+        </button>
+        <button class="bouton discret" onClick={props.onRetour}>
+          {T.boutons.retour}
+        </button>
+      </footer>
+    </div>
   )
 }
 
 function EcranTexte(props: { texte: string; photo: boolean; onAnalyser: (t: string) => void; onRetour: () => void }) {
   const [texte, setTexte] = useState(props.texte)
-  const guide = !texte.trim()
   return (
     <div class="ecran">
       <div class="defilement">
         <h1>{props.photo ? T.texte.titrePhoto : T.texte.titre}</h1>
         {props.photo && !props.texte && <p class="avertissement">{T.texte.vide}</p>}
-        {guide && IOS && (
-          <div class="guide">
-            <strong>{T.texte.iosTitre}</strong>
-            <ol>
-              <li>{T.texte.ios1}</li>
-              <li>
-                {T.texte.ios2} <IconeScanTexte /> {T.texte.ios2bis}
-              </li>
-              <li>{T.texte.ios3}</li>
-            </ol>
-            <small>{T.texte.iosNote}</small>
-          </div>
-        )}
-        {guide && !IOS && <p class="guide">{T.texte.android}</p>}
-        {!guide && <p class="aide">{T.texte.aide}</p>}
+        <p class="aide">{T.texte.aide}</p>
         <textarea
           class="texte-ocr"
           placeholder={T.texte.placeholder}
@@ -407,9 +591,11 @@ function EcranTexte(props: { texte: string; photo: boolean; onAnalyser: (t: stri
         <button class="bouton principal" disabled={!texte.trim()} onClick={() => props.onAnalyser(texte)}>
           {T.boutons.analyser}
         </button>
-        <label for="entree-photo" class="bouton secondaire">
-          {props.photo ? T.boutons.reprendre : T.boutons.photoAppli}
-        </label>
+        {props.photo && (
+          <label for="entree-photo" class="bouton secondaire">
+            {T.boutons.reprendre}
+          </label>
+        )}
         <button class="bouton discret" onClick={props.onRetour}>
           {T.boutons.retour}
         </button>
@@ -418,9 +604,10 @@ function EcranTexte(props: { texte: string; photo: boolean; onAnalyser: (t: stri
   )
 }
 
-function EcranAttente(props: { message: string; progression?: number }) {
+function EcranAttente(props: { message: string; progression?: number; apercu?: string }) {
   return (
     <div class="ecran attente">
+      {props.apercu && <img class="apercu" src={props.apercu} alt="" />}
       <div class="roue" aria-hidden="true" />
       <p role="status">{props.message}</p>
       {props.progression !== undefined && (

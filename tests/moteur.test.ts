@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { analyse, categorieARisque, estTexteAliment, preparerListes, type Ressources } from '../src/engine/analyse.ts'
 import { Dictionnaire, levenshteinBorne } from '../src/engine/dictionnaire.ts'
 import { segmenter } from '../src/engine/lecture.ts'
+import { analyseIA } from '../src/engine/ia.ts'
 import { classer } from '../src/engine/rules.ts'
 import { corrigerOcr } from '../src/engine/texte.ts'
 
@@ -230,5 +231,70 @@ describe('Verdicts', () => {
     const res = texte('Aqua, Hydrated Silica, Sorbitol, Glycerin, Sodium Lauryl Sulfate, Aroma, Sodium Fluoride, Sodium Saccharin, Limonene')
     expect(res.verdict).toBe('vert')
     expect(res.ingredients.find((i) => i.nom === 'SODIUM FLUORIDE')?.classement.niveau).toBe('exclu')
+  })
+})
+
+describe('Lecture par Claude (réponse du relais)', () => {
+  const base = { liste_trouvee: true, lisibilite: 'bonne' as const, nom_produit: null, remarque: null, texte_lu: '' }
+  it('jus de raisin : aliment, vert', () => {
+    const res = analyseIA(
+      {
+        ...base,
+        type_produit: 'aliment',
+        ingredients: [{ nom_lu: 'Raisins issus de cépages Syrah, Chardonnay et Grenache', nom_normalise: 'raisin', quantite: '100 %', commentaire: 'fruit pressé' }],
+      },
+      r,
+    )
+    expect(res.verdict).toBe('vert')
+    expect(res.aliment).toBe(true)
+    expect(res.ingredients[0].quantite).toBe('100 %')
+  })
+  it('anti-moustique : IR3535 et nom chimique fusionnés, quantité gardée', () => {
+    const res = analyseIA(
+      {
+        ...base,
+        type_produit: 'biocide',
+        ingredients: [
+          { nom_lu: 'IR3535', nom_normalise: 'ETHYL BUTYLACETYLAMINOPROPIONATE', quantite: '35 %', commentaire: 'répulsif anti-moustique' },
+          { nom_lu: 'ethyl butylacetylaminopropionate', nom_normalise: 'ETHYL BUTYLACETYLAMINOPROPIONATE', quantite: null, commentaire: 'répulsif' },
+        ],
+      },
+      r,
+    )
+    expect(res.ingredients).toHaveLength(1)
+    expect(res.ingredients[0].quantite).toBe('35 %')
+    expect(res.verdict).toBe('vert')
+  })
+  it('PFAS : le verdict vient de nos règles, pas du commentaire', () => {
+    const res = analyseIA(
+      {
+        ...base,
+        type_produit: 'cosmetique',
+        ingredients: [
+          { nom_lu: 'Aqua', nom_normalise: 'AQUA', quantite: null, commentaire: 'eau' },
+          { nom_lu: 'PTFE', nom_normalise: 'PTFE', quantite: null, commentaire: 'poudre de texture' },
+          { nom_lu: 'Sodium Fluoride', nom_normalise: 'SODIUM FLUORIDE', quantite: null, commentaire: 'anti-caries' },
+        ],
+      },
+      r,
+    )
+    expect(res.verdict).toBe('rouge')
+    expect(res.ingredients.find((i) => i.nom === 'SODIUM FLUORIDE')?.classement.niveau).toBe('exclu')
+  })
+  it('aucune liste sur la photo : gris avec la remarque de Claude', () => {
+    const res = analyseIA(
+      { ...base, liste_trouvee: false, type_produit: 'cosmetique', ingredients: [], remarque: 'Face avant du flacon, la liste est sans doute au dos.' },
+      r,
+    )
+    expect(res.verdict).toBe('gris')
+    expect(res.phrase).toContain('au dos')
+  })
+  it('liste coupée : mise en garde', () => {
+    const res = analyseIA(
+      { ...base, lisibilite: 'partielle', type_produit: 'cosmetique', ingredients: [{ nom_lu: 'Aqua', nom_normalise: 'AQUA', quantite: null, commentaire: 'eau' }] },
+      r,
+    )
+    expect(res.avertissement).toContain('coupée')
+    expect(res.confiance).toBe('moyenne')
   })
 })
