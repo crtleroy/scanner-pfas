@@ -771,3 +771,9 @@ details.carte summary {
   border-radius: 8px;
   padding: 0.5rem 0.7rem;
 }
+.titre-appli .version {
+  font-weight: 400;
+  font-size: 0.72rem;
+  opacity: 0.6;
+  margin-left: 0.3rem;
+}

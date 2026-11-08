@@ -266,7 +266,9 @@ function EcranScan(props: { surCode: (c: string) => void; onLireListe: () => voi
     <div class="ecran scan">
       <video ref={video} class="video" playsInline muted autoPlay />
       <header class="scan-entete">
-        <span class="titre-appli">{T.appli}</span>
+        <span class="titre-appli">
+          {T.appli} <small class="version">version du {__VERSION__}</small>
+        </span>
         <button class="lien-clair" onClick={props.onSources}>
           {T.boutons.sources}
         </button>

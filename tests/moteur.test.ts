@@ -65,6 +65,29 @@ describe('Photos réelles du 08/11/2026', () => {
     expect(lu).toContain('IR 3535')
   })
 
+  it('anti-moustique, texte lu par Tesseract sur l’iPhone (capture du 08/11)', () => {
+    const res = analyse(
+      `PROPRIÉTÉS : Produit a usage biocide
+(TP14
+a àlusoge humain, qui repousse
+efficocemes +.
+Mo |ledes spp., Culex spp. et Anopheles
+4 ie fabriqué dans I'U.E. / –
+4  Ls (P19, Répulsif – Liquide, prêt 0!
+empo + 9      '
+    "COMPOSITION : Contient de | 1R3535
+5 °F
+(ethyl butylacetylaminopropionate – (53
+q`,
+      { source: 'photo' },
+      r,
+    )
+    expect(res.ingredients.filter((i) => i.reconnu).map((i) => i.nom)).toEqual(['ETHYL BUTYLACETYLAMINOPROPIONATE'])
+    expect(morceauxDe(res, 'ingredient')).toContain('1R3535')
+    expect(res.verdict).toBe('vert')
+    expect(res.avertissement).toContain('autour de la composition')
+  })
+
   it('médicament : noms de pharmacie', () => {
     const t =
       'COMPOSITION EN SUBSTANCE ACTIVE\nPovidone iodée .............. 10 g\nPour 100 g de gel.\nLISTE DES EXCIPIENTS\nMacrogol 400, macrogol 4000,\nmacrogol 6000, eau purifiée.\nFORME PHARMACEUTIQUE\nET CONTENU\nGel\nTube de 30g'

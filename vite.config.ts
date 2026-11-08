@@ -5,6 +5,12 @@ import { VitePWA } from 'vite-plugin-pwa'
 // L'appli est publiée sur https://crtleroy.github.io/scanner-pfas/
 export default defineConfig({
   base: '/scanner-pfas/',
+  // Date de construction, affichée dans l'appli pour savoir quelle version tourne sur le téléphone
+  define: {
+    __VERSION__: JSON.stringify(
+      new Date().toLocaleString('fr-FR', { timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
+    ),
+  },
   plugins: [
     preact(),
     VitePWA({

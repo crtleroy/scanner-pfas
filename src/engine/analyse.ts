@@ -166,7 +166,10 @@ export function conclure(
   const confiance: Confiance = complet ? 'élevée' : partComprise >= 0.5 ? 'moyenne' : 'faible'
   const marqueur = /ingr[eé]dien|composition|\binci\b|excipient|zutaten/i.test(texte)
   let avertissement: string | undefined
-  if (partComprise < 0.3)
+  if (partComprise < 0.3 && marqueur)
+    avertissement =
+      'Une grande partie du texte n’a pas été comprise (texte autour de la composition, ou mal lu). Les morceaux en gris pointillé n’ont pas été reconnus.'
+  else if (partComprise < 0.3)
     avertissement = 'La plus grande partie du texte n’a pas été comprise : ce n’est peut-être pas la liste d’ingrédients.'
   else if (!marqueur && reconnus <= 3 && partComprise < 0.6)
     avertissement = 'Ce texte ne ressemble pas à une liste d’ingrédients : pas de mention « Ingrédients » ou « Composition », et peu d’ingrédients reconnus.'

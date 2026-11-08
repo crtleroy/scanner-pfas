@@ -72,7 +72,7 @@ export function EcranSources(props: { onRetour: () => void }) {
             <p class="mention">{expl.mention}</p>
           </>
         )}
-        <p class="aide">Lecture des codes-barres : ZXing (WebAssembly). Lecture du texte : Tesseract.js.</p>
+        <p class="aide">Lecture des codes-barres : ZXing (WebAssembly). Lecture du texte : Tesseract.js. Version du {__VERSION__}.</p>
       </div>
       <footer class="actions">
         <button class="bouton principal" onClick={props.onRetour}>

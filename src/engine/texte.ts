@@ -8,8 +8,13 @@ const CONFUSIONS_OCR: Record<string, string> = { '0': 'o', '1': 'l', '5': 's' }
  * (« perflu0r0decalin » → « perfluorodecalin »). Les chiffres en bord de mot (PEG-100, C9-15) restent.
  */
 export function corrigerOcr(cle: string): string {
-  return cle.replace(/([a-z])([015]+)(?=[a-z])/g, (_, avant: string, suite: string) =>
-    avant + suite.split('').map((ch) => CONFUSIONS_OCR[ch]).join(''),
+  return (
+    cle
+      .replace(/([a-z])([015]+)(?=[a-z])/g, (_, avant: string, suite: string) =>
+        avant + suite.split('').map((ch) => CONFUSIONS_OCR[ch]).join(''),
+      )
+      // « 1R3535 » : un I majuscule en début de mot lu comme un 1
+      .replace(/^1(?=[a-z])/, 'i')
   )
 }
 
