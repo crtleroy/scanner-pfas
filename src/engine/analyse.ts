@@ -11,14 +11,27 @@ export type { IngredientAnalyse, Morceau } from './lecture.ts'
  */
 export type Source = 'base_beaute' | 'base_alimentaire' | 'base_produits' | 'photo' | 'texte' | 'ia' | 'recherche'
 
+/** Un fait relevé par la recherche, toujours avec au moins une source */
+export interface FaitSource {
+  texte: string
+  date: string | null
+  sources: string[]
+}
+
 /** Ce que la recherche internet a rapporté, pour l'affichage */
 export interface InfosRecherche {
   produit: { marque: string | null; nom: string; categorie: string | null }
-  sources: { titre: string; url: string }[]
-  indices: { fait: string; sens: 'presence' | 'absence' | 'incertain'; source: string | null }[]
-  contradictions: string[]
-  deduction: { niveau: 'probable' | 'possible' | 'peu_probable' | 'inconnu'; explication: string }
   compositionTrouvee: boolean
+  sourcesComposition: string[]
+  /** absence_prouvee : analyse ou certification indépendante ; presence_prouvee : analyse, rappel, liste officielle */
+  preuves: { niveau: 'absence_prouvee' | 'inconnu' | 'presence_prouvee'; commentaire: string; faits: FaitSource[] }
+  bases: { nom: string; resultat: string; url: string | null }[]
+  historique: FaitSource[]
+  marqueDit: FaitSource[]
+  autresDisent: FaitSource[]
+  contradictions: FaitSource[]
+  deduction: { niveau: 'probable' | 'possible' | 'peu_probable' | 'inconnu'; explication: string }
+  sources: { titre: string; url: string }[]
   recherches: number
   depuisMemoire: boolean
 }
@@ -142,7 +155,7 @@ export function conclure(
     return {
       ...base,
       verdict: 'rouge',
-      titre: 'PFAS détecté',
+      titre: 'PFAS dans la liste',
       phrase: `${pluriel(pfas.length, 'ingrédient')} de la famille des PFAS`,
       confiance: parListe ? 'élevée' : 'moyenne',
       familles,
@@ -168,7 +181,7 @@ export function conclure(
     return {
       ...base,
       verdict: 'vert',
-      titre: 'Aucun PFAS détecté',
+      titre: 'Aucun PFAS dans la liste',
       phrase: 'Aucun PFAS dans la liste d’ingrédients.',
       confiance: 'moyenne',
       familles,
@@ -200,7 +213,7 @@ export function conclure(
   return {
     ...base,
     verdict: 'vert',
-    titre: 'Aucun PFAS détecté',
+    titre: 'Aucun PFAS dans la liste',
     phrase: complet ? 'Aucun PFAS dans la composition déclarée.' : 'Aucun PFAS dans ce qui a été lu.',
     confiance,
     ...(avertissement ? { avertissement } : {}),

@@ -49,23 +49,28 @@ export async function lireCode(source: CanvasImageSource | ImageBitmap): Promise
   return null
 }
 
+export interface Photo {
+  /** Image prête à envoyer (JPEG, 1568 px au plus) */
+  image: Blob
+  /** Image en pleine définition, pour y chercher un code-barres dans le téléphone */
+  toile: HTMLCanvasElement
+}
+
 export interface Camera {
   arreter(): void
-  /** Image actuelle de la caméra, prête à envoyer (JPEG, 1568 px au plus) */
-  capturer(): Promise<Blob>
+  /** Prend une photo dans l'image de la caméra */
+  capturer(): Promise<Photo>
 }
 
 /**
- * Démarre la caméra arrière dans `video` et lit en continu la zone centrale.
- * Appelle `surCode` quand le même code a été lu deux fois de suite ; s'il renvoie false, la lecture continue
- * (par exemple pour ignorer le code du produit dont on photographie la liste).
+ * Démarre la caméra arrière dans `video`, comme un appareil photo : pas de lecture continue.
+ * Le code-barres éventuel est cherché sur la photo prise (voir lireCode).
  */
-export async function demarrerCamera(video: HTMLVideoElement, surCode: (code: string) => boolean | void): Promise<Camera> {
+export async function demarrerCamera(video: HTMLVideoElement): Promise<Camera> {
   const flux = await navigator.mediaDevices.getUserMedia({
     video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
     audio: false,
   })
-  let actif = true
   const piste = flux.getVideoTracks()[0]
   try {
     await piste.applyConstraints({ advanced: [{ focusMode: 'continuous' } as MediaTrackConstraintSet] })
@@ -77,57 +82,18 @@ export async function demarrerCamera(video: HTMLVideoElement, surCode: (code: st
   video.muted = true
   await video.play()
 
-  const toile = document.createElement('canvas')
-  const ctx = toile.getContext('2d', { willReadFrequently: true })!
-  const d = await obtenirDetecteur()
-  let precedent = ''
-
-  const boucle = async () => {
-    if (!actif) return
-    try {
-      if (video.readyState >= 2 && video.videoWidth) {
-        // Zone centrale (celle du cadre affiché), réduite à 1280 px de large au plus
-        const lv = video.videoWidth
-        const hv = video.videoHeight
-        const lz = lv * 0.9
-        const hz = Math.min(hv * 0.5, lz * 0.6)
-        const echelle = Math.min(1, 1280 / lz)
-        toile.width = Math.round(lz * echelle)
-        toile.height = Math.round(hz * echelle)
-        ctx.drawImage(video, (lv - lz) / 2, (hv - hz) / 2, lz, hz, 0, 0, toile.width, toile.height)
-        const resultats = await d.detect(toile)
-        let lu = ''
-        for (const r of resultats) {
-          const code = normaliserCode(r.rawValue, r.format)
-          if (code) {
-            lu = code
-            break
-          }
-        }
-        if (lu && lu === precedent) {
-          if (surCode(lu) !== false) {
-            actif = false
-            return
-          }
-          lu = ''
-        }
-        precedent = lu
-      }
-    } catch {
-      /* image illisible : on continue */
-    }
-    if (actif) setTimeout(boucle, 120)
-  }
-  boucle()
-
   return {
     arreter() {
-      actif = false
       for (const p of flux.getTracks()) p.stop()
       video.srcObject = null
     },
-    capturer() {
-      return preparerImage(video, video.videoWidth, video.videoHeight)
+    async capturer() {
+      const toile = document.createElement('canvas')
+      toile.width = video.videoWidth
+      toile.height = video.videoHeight
+      toile.getContext('2d')!.drawImage(video, 0, 0)
+      const image = await preparerImage(toile, toile.width, toile.height)
+      return { image, toile }
     },
   }
 }

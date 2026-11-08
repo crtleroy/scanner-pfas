@@ -2,7 +2,7 @@
 // Claude lit, recopie et cherche ; le verdict PFAS vient toujours de nos règles, nom par nom.
 import { classer, estPfas, plusGrave, type Classement } from './rules.ts'
 import type { IngredientAnalyse } from './lecture.ts'
-import type { Confiance, InfosRecherche, Resultat, Ressources } from './analyse.ts'
+import type { Confiance, FaitSource, InfosRecherche, Resultat, Ressources } from './analyse.ts'
 
 type IngredientIA = { nom_lu: string; nom_normalise: string; quantite: string | null; commentaire: string }
 
@@ -24,12 +24,48 @@ export interface ReponseRecherche {
   produit: { marque: string | null; nom: string; categorie: string | null }
   composition_trouvee: boolean
   ingredients: IngredientIA[]
-  indices: { fait: string; sens: 'presence' | 'absence' | 'incertain'; source: string | null }[]
-  sources: { titre: string; url: string }[]
+  sources_composition: string[]
+  preuves: { niveau: 'absence_prouvee' | 'inconnu' | 'presence_prouvee'; commentaire: string; faits: FaitSource[] }
+  bases: { nom: string; resultat: string; url: string | null }[]
+  historique: FaitSource[]
+  marque_dit: FaitSource[]
+  autres_disent: FaitSource[]
   deduction_categorie: { niveau: 'probable' | 'possible' | 'peu_probable' | 'inconnu'; explication: string }
-  contradictions: string[]
+  contradictions: FaitSource[]
+  sources: { titre: string; url: string }[]
   remarque: string | null
   recherches?: number
+}
+
+export function infosRecherche(rep: ReponseRecherche, depuisMemoire: boolean): InfosRecherche {
+  return {
+    produit: rep.produit,
+    compositionTrouvee: rep.composition_trouvee,
+    sourcesComposition: rep.sources_composition ?? [],
+    preuves: rep.preuves ?? { niveau: 'inconnu', commentaire: '', faits: [] },
+    bases: rep.bases ?? [],
+    historique: rep.historique ?? [],
+    marqueDit: rep.marque_dit ?? [],
+    autresDisent: rep.autres_disent ?? [],
+    contradictions: rep.contradictions ?? [],
+    deduction: rep.deduction_categorie,
+    sources: rep.sources ?? [],
+    recherches: rep.recherches ?? 0,
+    depuisMemoire,
+  }
+}
+
+/**
+ * Ajoute une recherche internet à un résultat déjà établi (liste lue sur la photo ou base de données) :
+ * le verdict « PFAS listés » reste celui de la liste ; la recherche remplit les autres encarts.
+ */
+export function ajouterRecherche(res: Resultat, rep: ReponseRecherche, depuisMemoire: boolean): Resultat {
+  const infos = infosRecherche(rep, depuisMemoire)
+  return {
+    ...res,
+    recherche: infos,
+    typeProduit: res.typeProduit && res.typeProduit !== 'inconnu' ? res.typeProduit : (rep.produit.categorie ?? res.typeProduit),
+  }
 }
 
 function pluriel(n: number, mot: string): string {
@@ -118,7 +154,7 @@ export function analyseIA(rep: ReponseIA, r: Ressources): Resultat {
     return {
       ...base,
       verdict: 'rouge',
-      titre: 'PFAS détecté',
+      titre: 'PFAS dans la liste',
       phrase: `${pluriel(pfas.length, 'ingrédient')} de la famille des PFAS`,
       confiance: pfas.some((i) => i.classement.niveau === 'liste') && confiance !== 'faible' ? 'élevée' : 'moyenne',
       ...(avertissement ? { avertissement } : {}),
@@ -138,34 +174,26 @@ export function analyseIA(rep: ReponseIA, r: Ressources): Resultat {
   return {
     ...base,
     verdict: 'vert',
-    titre: 'Aucun PFAS détecté',
+    titre: 'Aucun PFAS dans la liste',
     phrase: aliment ? 'Aucun PFAS dans la liste d’ingrédients.' : 'Aucun PFAS dans la composition lue.',
     confiance,
     ...(avertissement ? { avertissement } : {}),
   }
 }
 
-/** Résultat d'une recherche internet sur un produit reconnu */
+/** Résultat d'une recherche internet sur un produit reconnu, quand aucune liste n'a été lue sur la photo */
 export function analyseRecherche(rep: ReponseRecherche, r: Ressources, depuisMemoire = false): Resultat {
+  const infos = infosRecherche(rep, depuisMemoire)
   const ingredients = ingredientsUniques(rep.ingredients, r)
-  // Un indice de présence qui nomme une substance fluorée (« revêtement PTFE ») compte comme un ingrédient
-  for (const indice of rep.indices) {
-    if (indice.sens !== 'presence') continue
-    const cl = classer(indice.fait, r.listes)
-    if (!estPfas(cl.niveau) || ingredients.some((i) => estPfas(i.classement.niveau) && i.classement.famille === cl.famille)) continue
-    ingredients.push({ brut: indice.fait, nom: indice.fait, reconnu: false, classement: cl, commentaire: 'relevé dans une source' })
+  // Une présence prouvée qui nomme une substance fluorée (« revêtement PTFE ») compte comme un ingrédient
+  if (infos.preuves.niveau === 'presence_prouvee') {
+    for (const fait of infos.preuves.faits) {
+      const cl = classer(fait.texte, r.listes)
+      if (!estPfas(cl.niveau) || ingredients.some((i) => estPfas(i.classement.niveau) && i.classement.famille === cl.famille)) continue
+      ingredients.push({ brut: fait.texte, nom: fait.texte, reconnu: false, classement: cl, commentaire: 'relevé dans une source' })
+    }
   }
 
-  const infos: InfosRecherche = {
-    produit: rep.produit,
-    sources: rep.sources,
-    indices: rep.indices,
-    contradictions: rep.contradictions,
-    deduction: rep.deduction_categorie,
-    compositionTrouvee: rep.composition_trouvee,
-    recherches: rep.recherches ?? 0,
-    depuisMemoire,
-  }
   const aliment = /aliment|boisson|jus|nourriture/i.test(rep.produit.categorie ?? '')
   const base = {
     ingredients,
@@ -179,9 +207,9 @@ export function analyseRecherche(rep: ReponseRecherche, r: Ressources, depuisMem
     recherche: infos,
     ...(rep.remarque ? { remarque: rep.remarque } : {}),
   }
-  const contradiction = rep.contradictions.length > 0
+  const contradiction = infos.contradictions.length > 0
   const avertissement = contradiction
-    ? `Les sources se contredisent (${pluriel(rep.contradictions.length, 'point')}) : voyez le détail ci-dessous avant de conclure.`
+    ? `Les sources se contredisent (${pluriel(infos.contradictions.length, 'point')}) : voyez le détail ci-dessous avant de conclure.`
     : undefined
   const avecAvertissement = avertissement ? { avertissement } : {}
 
@@ -190,7 +218,7 @@ export function analyseRecherche(rep: ReponseRecherche, r: Ressources, depuisMem
     return {
       ...base,
       verdict: 'rouge',
-      titre: 'PFAS détecté',
+      titre: 'PFAS dans la composition',
       phrase: rep.composition_trouvee
         ? `${pluriel(pfas.length, 'ingrédient')} de la famille des PFAS dans la composition trouvée en ligne`
         : 'Une source signale une substance de la famille des PFAS',
@@ -213,7 +241,7 @@ export function analyseRecherche(rep: ReponseRecherche, r: Ressources, depuisMem
     return {
       ...base,
       verdict: 'vert',
-      titre: 'Aucun PFAS détecté',
+      titre: 'Aucun PFAS dans la composition',
       phrase: 'Aucun PFAS dans la composition trouvée en ligne.',
       confiance: contradiction ? 'faible' : 'moyenne',
       ...avecAvertissement,
@@ -228,7 +256,7 @@ export function analyseRecherche(rep: ReponseRecherche, r: Ressources, depuisMem
   return {
     ...base,
     verdict: 'gris',
-    titre: 'Indéterminé',
+    titre: 'Composition inconnue',
     phrase: `Composition introuvable en ligne. ${d.explication}`.trim(),
     confiance: 'faible',
     ...avecAvertissement,

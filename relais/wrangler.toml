@@ -8,7 +8,7 @@ compatibility_flags = ["nodejs_compat"]
 [vars]
 MODELE_PHOTO = "claude-haiku-5-5"
 MODELE_RECHERCHE = "claude-haiku-5-5"
-RECHERCHES_MAX = "4"
+RECHERCHES_MAX = "6"
 
 # Mémoire partagée des recherches déjà faites (par produit et par code-barres)
 [[kv_namespaces]]

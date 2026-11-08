@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'preact/hooks'
-import type { IngredientAnalyse, Morceau, Resultat } from './engine/analyse.ts'
+import type { FaitSource, IngredientAnalyse, Morceau, Resultat } from './engine/analyse.ts'
 import { estPfas } from './engine/rules.ts'
 import { evaluerGravite, usageDuProduit } from './engine/gravite.ts'
 import { chargerDetails, chargerExplications, chargerRessources, type Explications, type Produit } from './donnees.ts'
@@ -12,7 +12,7 @@ const LIBELLE_SOURCE: Record<Resultat['source'], string> = {
   photo: 'photo de l’étiquette, lue sur le téléphone (Tesseract)',
   texte: 'texte saisi ou collé',
   ia: 'photo de l’étiquette, lue par Claude Haiku 5.5 (Anthropic)',
-  recherche: 'produit reconnu sur la photo, composition cherchée sur internet par Claude Haiku 5.5 (Anthropic)',
+  recherche: 'composition cherchée sur internet par Claude Haiku 5.5 (Anthropic)',
 }
 
 function classeIngredient(i: IngredientAnalyse): string {
@@ -34,11 +34,43 @@ type Cible =
   | { type: 'bruit'; lu: string }
   | { type: 'general' }
 
+/** Liens vers les sources d'un fait, par nom de site */
+function Sources(props: { urls: string[] }) {
+  if (!props.urls.length) return null
+  return (
+    <span class="sources-fait">
+      {props.urls.map((u, n) => (
+        <a key={n} href={u} target="_blank" rel="noopener">
+          {domaine(u)}
+        </a>
+      ))}
+    </span>
+  )
+}
+
+/** Faits sourcés d'un encart ; « rien trouvé » si la liste est vide */
+function Faits(props: { faits: FaitSource[] }) {
+  if (!props.faits.length) return <p class="aide">{T.encarts.rienTrouve}</p>
+  return (
+    <ul class="faits">
+      {props.faits.map((f, n) => (
+        <li key={n}>
+          {f.date && <strong class="date">{f.date} · </strong>}
+          {f.texte} <Sources urls={f.sources} />
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 export function EcranResultat(props: {
   resultat: Resultat
   produit?: Produit
   /** Nom du produit lu sur la photo par Claude */
   nomLu?: string
+  /** Photo prise par l'utilisateur */
+  photo?: string
+  rechercheEtat?: 'en_cours' | 'erreur' | 'aucune'
   onAutre: () => void
   onCorriger: () => void
   onLireEtiquette: () => void
@@ -65,8 +97,16 @@ export function EcranResultat(props: {
   const cosmetique = usageDuProduit(r) === 'cosmetique'
   const lignes = r.ingredients.filter((i) => i.reconnu || i.classement.niveau !== 'aucun')
   const signales = r.ingredients.filter((i) => i.classement.niveau !== 'aucun')
+  const nbPfas = r.ingredients.filter((i) => estPfas(i.classement.niveau)).length
   const nbBruits = r.morceaux.filter((m) => m.type === 'bruit').length
   const aDuTexte = r.texte.trim().length > 0
+
+  // En-tête : ta photo, sinon celle de la base ; nom le plus précis disponible
+  const image = props.photo ?? produit?.image
+  const nom = rech
+    ? [rech.produit.marque, rech.produit.nom].filter(Boolean).join(' ')
+    : (produit?.nom ?? props.nomLu ?? (r.source === 'texte' ? 'Liste saisie' : 'Produit photographié'))
+  const sousTitre = rech?.produit.categorie ?? produit?.marque ?? null
 
   /** Commentaire d'une ligne : l'état PFAS d'abord (nos règles), puis ce qu'est l'ingrédient */
   function commentaire(i: IngredientAnalyse) {
@@ -88,37 +128,30 @@ export function EcranResultat(props: {
     )
   }
 
+  // Ligne « listes de l'appli » des bases de données : ce que nos propres listes disent de la composition
+  const ligneAppli = lignes.length
+    ? `${lignes.length} ingrédient${lignes.length > 1 ? 's' : ''} vérifié${lignes.length > 1 ? 's' : ''}, ${
+        nbPfas ? `${nbPfas} classé${nbPfas > 1 ? 's' : ''} PFAS` : 'aucun classé PFAS'
+      } (définition OCDE 2021).`
+    : null
+
   return (
     <div class="ecran resultat">
       <div class="defilement">
-        {produit ? (
-          <div class="produit">
-            {produit.image && <img src={produit.image} alt="" />}
-            <div>
-              <strong>{produit.nom ?? 'Produit sans nom'}</strong>
-              {produit.marque && <span>{produit.marque}</span>}
-              <small>Code {produit.code}</small>
-            </div>
+        {/* 1. Le produit */}
+        <div class={`entete-produit${image ? '' : ' sans-photo'}`}>
+          {image && <img src={image} alt="" />}
+          <div>
+            <strong>{nom}</strong>
+            {sousTitre && <span>{sousTitre}</span>}
+            {produit?.code && <small>Code {produit.code}</small>}
+            {rech && <small>{rech.depuisMemoire ? T.recherche.memoire : T.recherche.reconnu}</small>}
           </div>
-        ) : rech ? (
-          <div class="produit">
-            <div>
-              <strong>{[rech.produit.marque, rech.produit.nom].filter(Boolean).join(' ')}</strong>
-              {rech.produit.categorie && <span>{rech.produit.categorie}</span>}
-              <small>{rech.depuisMemoire ? T.recherche.memoire : T.recherche.reconnu}</small>
-            </div>
-          </div>
-        ) : (
-          props.nomLu && (
-            <div class="produit">
-              <div>
-                <strong>{props.nomLu}</strong>
-              </div>
-            </div>
-          )
-        )}
+        </div>
 
+        {/* 2. PFAS listés + liste des ingrédients repliée */}
         <section class={`verdict ${r.verdict}`} aria-live="polite">
+          <p class="encart-titre">{T.encarts.pfasListes}</p>
           <h1>
             <span class="pastille" aria-hidden="true" />
             {r.titre}
@@ -126,9 +159,43 @@ export function EcranResultat(props: {
           <p class="phrase">{r.phrase}</p>
           {lignes.length > 0 && (
             <p class="confiance">
-              {T.resultat.confiance} : {r.confiance} · {lignes.length} ingrédient{lignes.length > 1 ? 's' : ''}
+              {T.resultat.confiance} : {r.confiance}
               {!r.aliment && !ia && ` · ${Math.round(r.partComprise * 100)} % du texte compris`}
             </p>
+          )}
+          {lignes.length > 0 && (
+            <details class="liste-repliee">
+              <summary>
+                {T.encarts.listeIngredients} ({lignes.length})
+              </summary>
+              <table class="tableau-ing">
+                <thead>
+                  <tr>
+                    <th>{T.resultat.colIngredient}</th>
+                    <th>{T.resultat.colQuantite}</th>
+                    <th>{T.resultat.colCommentaire}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lignes.map((i, n) => (
+                    <tr key={n} class={classeIngredient(i)} onClick={() => setFiche({ type: 'ingredient', ing: i })}>
+                      <td class="nom">
+                        {i.nom}
+                        {ia && i.brut.trim().toLowerCase() !== i.nom.trim().toLowerCase() && <small>lu : {i.brut}</small>}
+                      </td>
+                      <td class="qte">{i.quantite ?? '—'}</td>
+                      <td class="com">{commentaire(i)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {rech && rech.sourcesComposition.length > 0 && (
+                <p class="aide">
+                  Composition trouvée sur : <Sources urls={rech.sourcesComposition} />
+                </p>
+              )}
+              <p class="aide">{T.resultat.toucherLigne}</p>
+            </details>
           )}
           {r.verdict !== 'vert' && (
             <button class="lien" onClick={() => setFiche({ type: 'general' })}>
@@ -137,23 +204,16 @@ export function EcranResultat(props: {
           )}
         </section>
 
-        {/* Les contradictions ont leur propre encadré : pas de doublon */}
         {r.avertissement && !(rech && rech.contradictions.length) && <p class="avertissement">{r.avertissement}</p>}
         {r.listeIncomplete && (
           <button class="bouton secondaire completer" onClick={props.onCompleter}>
             {T.boutons.completer}
           </button>
         )}
-        {rech && rech.contradictions.length > 0 && (
-          <section class="alerte-contradiction">
-            <h2>{T.recherche.contradictions}</h2>
-            <ul>
-              {rech.contradictions.map((c, n) => (
-                <li key={n}>{c}</li>
-              ))}
-            </ul>
-          </section>
-        )}
+        {r.remarque && <p class="note">{r.remarque}</p>}
+        {r.aliment && expl && <p class="note">{expl.aliment}</p>}
+        {r.verdict === 'rouge' && cosmetique && expl && <p class="reglementaire">{expl.reglementaire.texte}</p>}
+
         {gravite && expl && (
           <section class={`carte gravite ${gravite.niveau}`}>
             <h2>
@@ -186,87 +246,97 @@ export function EcranResultat(props: {
             </ul>
           </section>
         )}
-        {r.remarque && <p class="note">{r.remarque}</p>}
-        {r.aliment && expl && <p class="note">{expl.aliment}</p>}
-        {r.verdict === 'rouge' && cosmetique && expl && <p class="reglementaire">{expl.reglementaire.texte}</p>}
-        {produit && !produit.ingredients && !ia && <p class="aide">{T.resultat.sansComposition}</p>}
 
-        {lignes.length > 0 && (
-          <section class="carte tableau-carte">
-            <h2>
-              {T.resultat.ingredients} ({lignes.length})
-            </h2>
-            <table class="tableau-ing">
-              <thead>
-                <tr>
-                  <th>{T.resultat.colIngredient}</th>
-                  <th>{T.resultat.colQuantite}</th>
-                  <th>{T.resultat.colCommentaire}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {lignes.map((i, n) => (
-                  <tr key={n} class={classeIngredient(i)} onClick={() => setFiche({ type: 'ingredient', ing: i })}>
-                    <td class="nom">
-                      {i.nom}
-                      {ia && i.brut.trim().toLowerCase() !== i.nom.trim().toLowerCase() && <small>lu : {i.brut}</small>}
-                    </td>
-                    <td class="qte">{i.quantite ?? '—'}</td>
-                    <td class="com">{commentaire(i)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <p class="aide">{T.resultat.toucherLigne}</p>
+        {rech && rech.contradictions.length > 0 && (
+          <section class="alerte-contradiction">
+            <h2>{T.recherche.contradictions}</h2>
+            <Faits faits={rech.contradictions} />
           </section>
         )}
 
-        {rech && rech.indices.length > 0 && (
-          <section class="carte">
-            <h2>{T.recherche.indices}</h2>
-            <ul class="indices">
-              {rech.indices.map((i, n) => (
-                <li key={n} class={i.sens}>
-                  <span class="sens">{T.recherche.sens[i.sens]}</span> {i.fait}
-                  {i.source && (
-                    <>
-                      {' '}
-                      <a href={i.source} target="_blank" rel="noopener">
-                        ({domaine(i.source)})
-                      </a>
-                    </>
-                  )}
-                </li>
-              ))}
-            </ul>
+        {/* 3 à 7. Encarts de la recherche internet */}
+        {props.rechercheEtat === 'en_cours' && (
+          <section class="carte attente-recherche">
+            <div class="roue petite" aria-hidden="true" />
+            <p>{T.encarts.enCours}</p>
           </section>
         )}
+        {props.rechercheEtat === 'erreur' && <p class="note">{T.encarts.erreur}</p>}
+        {props.rechercheEtat === 'aucune' && !rech && <p class="note">{T.encarts.aucune}</p>}
+
         {rech && (
-          <section class="carte">
-            <h2>{T.recherche.sources}</h2>
-            {rech.sources.length ? (
-              <ul class="liste-simple">
-                {rech.sources.map((s, n) => (
+          <>
+            <section class={`carte preuves ${rech.preuves.niveau}`}>
+              <p class="encart-titre">{T.encarts.preuves}</p>
+              <h2>
+                <span class="pastille" aria-hidden="true" />
+                {T.encarts.niveauxPreuve[rech.preuves.niveau]}
+              </h2>
+              {rech.preuves.commentaire && <p>{rech.preuves.commentaire}</p>}
+              {rech.preuves.faits.length > 0 && <Faits faits={rech.preuves.faits} />}
+            </section>
+
+            <section class="carte">
+              <h2>{T.encarts.bases}</h2>
+              <ul class="faits">
+                {ligneAppli && (
+                  <li>
+                    <strong>Listes de l’appli (CosIng, Commission européenne)</strong> : {ligneAppli}
+                  </li>
+                )}
+                {produit && depuisBase && (
+                  <li>
+                    <strong>{produit.base.nom}</strong> : produit trouvé par son code-barres
+                    {produit.ingredients ? ', composition renseignée.' : ', sans composition.'}{' '}
+                    <Sources urls={[`${produit.base.site}/product/${produit.code}`]} />
+                  </li>
+                )}
+                {rech.bases.map((b, n) => (
                   <li key={n}>
-                    <a href={s.url} target="_blank" rel="noopener">
-                      {s.titre || domaine(s.url)}
-                    </a>{' '}
-                    <small>({domaine(s.url)})</small>
+                    <strong>{b.nom}</strong> : {b.resultat} {b.url && <Sources urls={[b.url]} />}
                   </li>
                 ))}
               </ul>
-            ) : (
-              <p class="aide">{T.recherche.aucuneSource}</p>
+              {!rech.bases.length && !ligneAppli && <p class="aide">{T.encarts.rienTrouve}</p>}
+            </section>
+
+            <section class="carte">
+              <h2>{T.encarts.historique}</h2>
+              <Faits faits={rech.historique} />
+            </section>
+
+            <section class="carte">
+              <h2>{T.encarts.marque}</h2>
+              <Faits faits={rech.marqueDit} />
+            </section>
+
+            <section class="carte">
+              <h2>{T.encarts.autres}</h2>
+              <Faits faits={rech.autresDisent} />
+            </section>
+
+            {rech.sources.length > 0 && (
+              <details class="carte">
+                <summary>
+                  {T.encarts.toutesSources} ({rech.sources.length})
+                </summary>
+                <ul class="liste-simple">
+                  {rech.sources.map((s, n) => (
+                    <li key={n}>
+                      <a href={s.url} target="_blank" rel="noopener">
+                        {s.titre || domaine(s.url)}
+                      </a>{' '}
+                      <small>({domaine(s.url)})</small>
+                    </li>
+                  ))}
+                </ul>
+              </details>
             )}
-            {rech.deduction.explication && rech.deduction.niveau !== 'inconnu' && (
-              <p class="aide">
-                {T.recherche.deduction} {rech.deduction.explication}
-              </p>
-            )}
-          </section>
+          </>
         )}
+
         {aDuTexte && (
-          <details class="carte" open={r.verdict === 'gris'}>
+          <details class="carte" open={r.verdict === 'gris' && !rech}>
             <summary>{ia ? T.resultat.texteLuIA : T.resultat.texteLu}</summary>
             {ia ? (
               <p class="texte-lu">{r.texte}</p>
@@ -295,14 +365,19 @@ export function EcranResultat(props: {
             {rech && (
               <li>
                 {rech.depuisMemoire
-                  ? 'Résultat d’une recherche déjà faite pour ce produit (mémoire partagée), sans nouvelle recherche payante.'
-                  : `Recherche internet : ${rech.recherches} recherche${rech.recherches > 1 ? 's' : ''} (4 au plus par produit).`}
+                  ? 'Recherche internet déjà faite pour ce produit (mémoire partagée), sans nouvelle recherche payante.'
+                  : `Recherche internet : ${rech.recherches} recherche${rech.recherches > 1 ? 's' : ''} (6 au plus par produit) par Claude Haiku 5.5. Seuls les faits avec une source vérifiée sont affichés.`}
+              </li>
+            )}
+            {rech && rech.deduction.niveau !== 'inconnu' && rech.deduction.explication && (
+              <li>
+                {T.recherche.deduction} {rech.deduction.explication} (raisonnement, pas un fait sourcé)
               </li>
             )}
             {ia ? (
               <li>
-                Claude a recopié la liste d’ingrédients et rédigé les commentaires. Le verdict PFAS ne vient pas de Claude :
-                l’appli vérifie chaque nom dans ses propres listes (CosIng et définition OCDE 2021).
+                Claude lit et cherche ; le verdict PFAS ne vient pas de Claude : l’appli vérifie chaque nom dans ses propres
+                listes (CosIng et définition OCDE 2021).
               </li>
             ) : (
               <li>
@@ -350,13 +425,9 @@ export function EcranResultat(props: {
         <button class="bouton principal" onClick={props.onAutre}>
           {T.boutons.autreProduit}
         </button>
-        {ia ? (
+        {ia || depuisBase ? (
           <button class="bouton secondaire" onClick={props.onLireEtiquette}>
             {T.boutons.reprendre}
-          </button>
-        ) : depuisBase ? (
-          <button class="bouton secondaire" onClick={props.onLireEtiquette}>
-            {T.boutons.lireEtiquette}
           </button>
         ) : (
           <button class="bouton secondaire" onClick={props.onCorriger}>

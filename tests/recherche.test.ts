@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { analyse, preparerListes, type Ressources } from '../src/engine/analyse.ts'
 import { Dictionnaire } from '../src/engine/dictionnaire.ts'
-import { analyseIA, analyseRecherche, type ReponseRecherche } from '../src/engine/ia.ts'
+import { ajouterRecherche, analyseIA, analyseRecherche, type ReponseRecherche } from '../src/engine/ia.ts'
 import { evaluerGravite } from '../src/engine/gravite.ts'
 
 const inci = JSON.parse(readFileSync('public/data/inci.json', 'utf8'))
@@ -16,12 +16,18 @@ const vide: ReponseRecherche = {
   produit: { marque: 'Marque', nom: 'Produit', categorie: null },
   composition_trouvee: false,
   ingredients: [],
-  indices: [],
-  sources: [],
+  sources_composition: [],
+  preuves: { niveau: 'inconnu', commentaire: '', faits: [] },
+  bases: [],
+  historique: [],
+  marque_dit: [],
+  autres_disent: [],
   deduction_categorie: { niveau: 'inconnu', explication: '' },
   contradictions: [],
+  sources: [],
   remarque: null,
 }
+const fait = (texte: string) => ({ texte, date: null, sources: ['https://exemple.fr'] })
 
 describe('Recherche internet sur un produit reconnu', () => {
   it('poêle Tefal : PTFE trouvé, rouge, gravité modérée, conseils de cuisine', () => {
@@ -34,7 +40,7 @@ describe('Recherche internet sur un produit reconnu', () => {
           { nom_lu: 'Revêtement antiadhésif PTFE', nom_normalise: 'PTFE', quantite: null, commentaire: 'revêtement antiadhésif' },
           { nom_lu: 'Aluminium', nom_normalise: 'aluminium', quantite: null, commentaire: 'corps de la poêle' },
         ],
-        indices: [{ fait: 'Tefal annonce un revêtement sans PFOA', sens: 'presence', source: 'https://www.tefal.fr' }],
+        marque_dit: [fait('Tefal annonce un revêtement sans PFOA')],
         sources: [{ titre: 'Tefal', url: 'https://www.tefal.fr' }],
       },
       r,
@@ -46,16 +52,20 @@ describe('Recherche internet sur un produit reconnu', () => {
     expect(g.niveau).toBe('moderee')
     expect(g.raisons.join(' ')).toContain('surchauffe')
   })
-  it('un indice « revêtement PTFE » sans composition suffit pour le rouge', () => {
+  it('une présence prouvée « revêtement PTFE » sans composition suffit pour le rouge', () => {
     const res = analyseRecherche(
-      { ...vide, produit: { marque: 'Tefal', nom: 'Poêle', categorie: 'poêle' }, indices: [{ fait: 'Revêtement en PTFE renforcé', sens: 'presence', source: null }] },
+      {
+        ...vide,
+        produit: { marque: 'Tefal', nom: 'Poêle', categorie: 'poêle' },
+        preuves: { niveau: 'presence_prouvee', commentaire: '', faits: [fait('Revêtement en PTFE renforcé')] },
+      },
       r,
     )
     expect(res.verdict).toBe('rouge')
   })
   it('« sans PFAS » déclaré par la marque ne déclenche pas d’alerte', () => {
     const res = analyseRecherche(
-      { ...vide, composition_trouvee: true, ingredients: [{ nom_lu: 'Butyl Acetate', nom_normalise: 'BUTYL ACETATE', quantite: null, commentaire: 'solvant' }], indices: [{ fait: 'La marque déclare ses vernis sans PFAS', sens: 'absence', source: null }] },
+      { ...vide, composition_trouvee: true, ingredients: [{ nom_lu: 'Butyl Acetate', nom_normalise: 'BUTYL ACETATE', quantite: null, commentaire: 'solvant' }], marque_dit: [fait('La marque déclare ses vernis sans PFAS')] },
       r,
     )
     expect(res.verdict).toBe('vert')
@@ -82,13 +92,39 @@ describe('Recherche internet sur un produit reconnu', () => {
         ...vide,
         composition_trouvee: true,
         ingredients: [{ nom_lu: 'Aqua', nom_normalise: 'AQUA', quantite: null, commentaire: 'eau' }],
-        contradictions: ['La marque annonce « sans PFAS » mais un revendeur liste du PTFE.'],
+        contradictions: [fait('La marque annonce « sans PFAS » mais un revendeur liste du PTFE.')],
       },
       r,
     )
     expect(res.avertissement).toContain('contredisent')
     expect(res.confiance).toBe('faible')
     expect(res.recherche?.contradictions).toHaveLength(1)
+  })
+})
+
+describe('Recherche ajoutée à une liste lue sur la photo', () => {
+  it('le verdict reste celui de la liste, la recherche remplit les encarts', () => {
+    const liste = analyseIA(
+      {
+        type_produit: 'cosmetique',
+        liste_trouvee: true,
+        liste_complete: true,
+        lisibilite: 'bonne',
+        nom_produit: 'Vernis',
+        ingredients: [{ nom_lu: 'Butyl Acetate', nom_normalise: 'BUTYL ACETATE', quantite: null, commentaire: 'solvant' }],
+        remarque: null,
+        texte_lu: 'BUTYL ACETATE',
+      },
+      r,
+    )
+    const res = ajouterRecherche(
+      liste,
+      { ...vide, historique: [fait('En 2023, la marque a reformulé sa gamme.')], preuves: { niveau: 'inconnu', commentaire: 'Aucune analyse.', faits: [] } },
+      false,
+    )
+    expect(res.verdict).toBe('vert')
+    expect(res.recherche?.historique).toHaveLength(1)
+    expect(res.recherche?.preuves.niveau).toBe('inconnu')
   })
 })
 

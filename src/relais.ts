@@ -70,10 +70,13 @@ export async function preparerImage(source: CanvasImageSource, largeur: number, 
 }
 
 /** Réponse du relais à « analyser » (une ou plusieurs photos) */
-export type ReponseAnalyse =
-  | { mode: 'liste'; etiquette: ReponseIA }
-  | { mode: 'produit'; etiquette: ReponseIA }
-  | { mode: 'recherche'; etiquette?: ReponseIA; recherche: ReponseRecherche; depuis_memoire: boolean }
+export type ReponseAnalyse = {
+  mode: 'liste' | 'produit'
+  etiquette: ReponseIA
+  /** Recherche déjà faite pour ce produit (mémoire partagée), quand il y en a une */
+  recherche?: ReponseRecherche
+  depuis_memoire?: boolean
+}
 
 export type ReponseRecherchee = { mode: 'recherche'; recherche: ReponseRecherche; depuis_memoire: boolean }
 
@@ -87,8 +90,10 @@ export async function analyserPhotos(images: Blob[], codeBarres?: string): Promi
 export function rechercherProduit(
   produit: { marque: string | null; nom: string; categorie: string | null },
   codeBarres?: string,
+  listeConnue = false,
 ): Promise<ReponseRecherchee> {
-  return appeler({ action: 'rechercher', produit, code_barres: codeBarres })
+  // listeConnue : la composition a déjà été lue (photo ou base) → la recherche ne la cherche pas
+  return appeler({ action: 'rechercher', produit, code_barres: codeBarres, liste_connue: listeConnue })
 }
 
 /** Recherche déjà faite pour ce code-barres ? (gratuit) */

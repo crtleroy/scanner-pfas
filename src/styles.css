@@ -1005,3 +1005,178 @@ details.carte summary {
   font-size: 1.1rem;
   text-align: center;
 }
+
+/* ---------- Appareil photo et résultat réorganisé (v5) ---------- */
+
+.liens-entete {
+  display: flex;
+  gap: 0.9rem;
+}
+.scan-espace {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.zone-declencheur {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 1rem 16px calc(1.1rem + env(safe-area-inset-bottom));
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.6));
+  color: rgba(255, 255, 255, 0.9);
+  text-align: center;
+}
+.zone-declencheur small {
+  font-size: 0.85rem;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+}
+.bouton-photo {
+  width: 78px;
+  height: 78px;
+  border-radius: 50%;
+  border: 4px solid #fff;
+  background: transparent;
+  padding: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.bouton-photo span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.1s;
+}
+.bouton-photo:active span {
+  transform: scale(0.9);
+}
+.bouton-photo:disabled {
+  opacity: 0.5;
+}
+
+.entete-produit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+.entete-produit img {
+  width: 100%;
+  max-height: 34vh;
+  object-fit: cover;
+  border-radius: 16px;
+  background: #000;
+}
+.entete-produit div {
+  display: flex;
+  flex-direction: column;
+}
+.entete-produit strong {
+  font-size: 1.15rem;
+}
+.entete-produit span,
+.entete-produit small {
+  color: var(--texte-doux);
+}
+.encart-titre {
+  margin: 0 0 0.2rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--texte-doux);
+}
+.liste-repliee {
+  margin-top: 0.8rem;
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 0.5rem 0.6rem;
+}
+.liste-repliee summary {
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.2rem;
+}
+.preuves h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.2rem 0 0.4rem;
+}
+.preuves.absence_prouvee {
+  background: var(--vert-fond);
+  border-color: transparent;
+}
+.preuves.absence_prouvee h2 {
+  color: var(--vert);
+}
+.preuves.inconnu {
+  background: var(--orange-fond);
+  border-color: transparent;
+}
+.preuves.inconnu h2 {
+  color: var(--orange);
+}
+.preuves.presence_prouvee {
+  background: var(--rouge-fond);
+  border-color: transparent;
+}
+.preuves.presence_prouvee h2 {
+  color: var(--rouge);
+}
+.faits {
+  list-style: none;
+  padding: 0;
+  margin: 0.3rem 0 0;
+}
+.faits li {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--bordure);
+  font-size: 0.95rem;
+}
+.faits li:last-child {
+  border-bottom: 0;
+}
+.faits .date {
+  color: var(--texte-doux);
+}
+.sources-fait {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-left: 0.2rem;
+  vertical-align: baseline;
+}
+.sources-fait a {
+  font-size: 0.75rem;
+  color: var(--texte-doux);
+  background: var(--gris-fond);
+  border-radius: 6px;
+  padding: 0.05rem 0.4rem;
+  text-decoration: none;
+}
+.attente-recherche {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+.attente-recherche p {
+  margin: 0;
+  color: var(--texte-doux);
+  font-size: 0.95rem;
+}
+.roue.petite {
+  width: 24px;
+  height: 24px;
+  border-width: 3px;
+  flex: none;
+}

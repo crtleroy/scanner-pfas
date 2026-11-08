@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'preact/hooks'
 import { analyse, type Resultat, type Source } from './engine/analyse.ts'
-import { analyseIA, analyseRecherche } from './engine/ia.ts'
+import { ajouterRecherche, analyseIA, analyseRecherche } from './engine/ia.ts'
 import { chargerRessources, chercherProduit, type Produit } from './donnees.ts'
 import { normaliserCode } from './codes.ts'
-import { bip, debloquerSon, demarrerCamera, lireCode, type Camera } from './scanner.ts'
+import { debloquerSon, demarrerCamera, lireCode, type Camera } from './scanner.ts'
 import { lireTexte, prechargerOcr, pretraiter, type Cadre } from './ocr.ts'
 import { analyserPhotos, codeAcces, enregistrerCode, ErreurRelais, memoireCodeBarres, preparerImage, rechercherProduit } from './relais.ts'
 import { T } from './textes.ts'
@@ -23,7 +23,16 @@ type Ecran =
   | { nom: 'recadrage'; image: HTMLImageElement }
   | { nom: 'lecture'; progression: number; etape: string }
   | { nom: 'texte'; texte: string; source: 'photo' | 'texte' }
-  | { nom: 'resultat'; resultat: Resultat; texte?: string; nomLu?: string }
+  | {
+      nom: 'resultat'
+      resultat: Resultat
+      texte?: string
+      nomLu?: string
+      /** Photo prise par l'utilisateur, affichée en haut */
+      photo?: string
+      /** Recherche internet : en cours, échouée, ou impossible (produit non identifié) */
+      rechercheEtat?: 'en_cours' | 'erreur' | 'aucune'
+    }
   | { nom: 'sources' }
   | { nom: 'erreur'; message: string }
 
@@ -44,6 +53,10 @@ export function App() {
   const photos = useRef<Blob[]>([])
   const completer = useRef(false)
   const [codeInconnu, setCodeInconnu] = useState<string | undefined>()
+  // Jeton de la photo en cours : une recherche qui revient après un changement de produit est ignorée
+  const jeton = useRef(0)
+  // Adresse locale de la photo du produit, gardée pour l'afficher en haut du résultat
+  const photoProduit = useRef<string | undefined>()
   const precedent = useRef<Ecran>({ nom: 'scan' })
 
   useEffect(() => {
@@ -80,6 +93,7 @@ export function App() {
     }
     // En développement seulement : « ?demo-recherche » affiche le résultat d'une recherche internet
     if (import.meta.env.DEV && location.search.includes('demo-recherche')) {
+      const src = (n: number) => [`https://source${n}.exemple/page`]
       chargerRessources().then((r) =>
         setEcran({
           nom: 'resultat',
@@ -91,18 +105,24 @@ export function App() {
                 { nom_lu: 'Revêtement antiadhésif Titanium (PTFE)', nom_normalise: 'PTFE', quantite: null, commentaire: 'revêtement antiadhésif' },
                 { nom_lu: 'Aluminium', nom_normalise: 'aluminium', quantite: null, commentaire: 'corps de la poêle' },
               ],
-              indices: [
-                { fait: 'Tefal annonce un revêtement « sans PFOA » : le PTFE reste un PFAS.', sens: 'presence', source: 'https://www.tefal.fr/ingenio' },
-                { fait: 'Un comparateur présente la gamme comme « sans PFAS ».', sens: 'absence', source: 'https://comparateur.exemple/poeles' },
+              sources_composition: src(1),
+              preuves: {
+                niveau: 'presence_prouvee',
+                commentaire: 'La composition déclarée par la marque contient du PTFE ; aucune certification « sans PFAS ».',
+                faits: [{ texte: 'Fiche technique : revêtement à base de PTFE (polytétrafluoroéthylène).', date: '2025', sources: src(1) }],
+              },
+              bases: [
+                { nom: 'Open Products Facts', resultat: 'Produit présent, composition non renseignée.', url: src(2)[0] },
+                { nom: 'Safety Gate (rappels UE)', resultat: 'Aucun rappel pour ce produit.', url: null },
               ],
-              sources: [
-                { titre: 'Tefal Ingenio Easy Cook & Clean', url: 'https://www.tefal.fr/ingenio' },
-                { titre: 'Comparatif des poêles', url: 'https://comparateur.exemple/poeles' },
-              ],
-              deduction_categorie: { niveau: 'probable', explication: 'Une poêle antiadhésive contient en général du PTFE, sauf revêtement céramique annoncé.' },
-              contradictions: ['Un comparateur dit la gamme « sans PFAS », alors que Tefal décrit un revêtement en PTFE.'],
+              historique: [{ texte: 'Le PFOA, utilisé pour fabriquer le PTFE, a été abandonné par le fabricant en 2012.', date: '2012', sources: src(3) }],
+              marque_dit: [{ texte: 'La marque annonce des revêtements « sans PFOA ».', date: null, sources: src(1) }],
+              autres_disent: [{ texte: 'Une association rappelle que « sans PFOA » ne veut pas dire sans PFAS.', date: '2024', sources: src(4) }],
+              deduction_categorie: { niveau: 'probable', explication: 'Une poêle antiadhésive contient en général du PTFE.' },
+              contradictions: [{ texte: 'Un comparateur dit la gamme « sans PFAS », alors que la marque décrit un revêtement en PTFE.', date: null, sources: [...src(1), ...src(4)] }],
+              sources: [1, 2, 3, 4].map((n) => ({ titre: `Source ${n}`, url: src(n)[0] })),
               remarque: null,
-              recherches: 3,
+              recherches: 5,
             },
             r,
           ),
@@ -112,7 +132,14 @@ export function App() {
     return () => clearTimeout(t)
   }, [])
 
+  const libererPhoto = () => {
+    if (photoProduit.current) URL.revokeObjectURL(photoProduit.current)
+    photoProduit.current = undefined
+  }
+
   const accueil = () => {
+    jeton.current++
+    libererPhoto()
     setProduit(undefined)
     setConsigne(undefined)
     setCodeInconnu(undefined)
@@ -125,14 +152,14 @@ export function App() {
   const versEtiquette = (code?: string) => {
     if (code) setCodeInconnu(code)
     completer.current = false
-    setConsigne({ texte: T.scan.consigneListe, ignorer: code ?? produit?.code ?? codeInconnu })
+    setConsigne({ texte: T.scan.consigneListe })
     setEcran({ nom: 'scan' })
   }
 
   /** Liste coupée : une photo de plus, envoyée avec les précédentes */
   const completerPhoto = () => {
     completer.current = true
-    setConsigne({ texte: T.scan.consigneSuite, ignorer: produit?.code ?? codeInconnu })
+    setConsigne({ texte: T.scan.consigneSuite })
     setEcran({ nom: 'scan' })
   }
 
@@ -147,15 +174,22 @@ export function App() {
     }
   }
 
+  /** Code-barres tapé à la main : base ouverte, puis recherche internet sur le produit */
   async function surCode(code: string) {
+    const n = ++jeton.current
+    libererPhoto()
     setProduit(undefined)
     setConsigne(undefined)
+    photos.current = []
+    completer.current = false
     setEcran({ nom: 'chargement', message: T.chargement.bases })
     const { produit: p, erreurs } = await chercherProduit(code)
+    if (jeton.current !== n) return
     if (!p) {
       // Inconnu des bases ouvertes, mais peut-être déjà recherché d'après une photo (mémoire partagée)
       setCodeInconnu(code)
       const [connu, r] = await Promise.all([memoireCodeBarres(code), chargerRessources().catch(() => null)])
+      if (jeton.current !== n) return
       if (connu && r) {
         setEcran({ nom: 'resultat', resultat: analyseRecherche(connu.recherche, r, true) })
         return
@@ -164,48 +198,109 @@ export function App() {
       return
     }
     setProduit(p)
-    await analyser(p.ingredients ?? '', p.base.id, p)
+    try {
+      const r = await chargerRessources()
+      const res = analyse(p.ingredients ?? '', { source: p.base.id, categories: p.categories, nomProduit: p.nom }, r)
+      if (!p.nom || !codeAcces()) {
+        setEcran({ nom: 'resultat', resultat: res, rechercheEtat: 'aucune' })
+        return
+      }
+      setEcran({ nom: 'resultat', resultat: res, rechercheEtat: 'en_cours' })
+      try {
+        const rech = await rechercherProduit({ marque: p.marque ?? null, nom: p.nom, categorie: null }, code, !!p.ingredients)
+        if (jeton.current === n) setEcran({ nom: 'resultat', resultat: ajouterRecherche(res, rech.recherche, rech.depuis_memoire) })
+      } catch {
+        if (jeton.current === n) setEcran({ nom: 'resultat', resultat: res, rechercheEtat: 'erreur' })
+      }
+    } catch {
+      setEcran({ nom: 'erreur', message: 'Impossible de charger les listes d’ingrédients. Vérifiez la connexion et réessayez.' })
+    }
   }
 
   /**
-   * Photo → relais → Claude lit la liste, ou reconnaît le produit puis cherche sa composition en ligne.
-   * Le verdict PFAS vient toujours de nos règles.
+   * Une photo, et l'appli décide : code-barres visible (lu dans le téléphone) → base ouverte ;
+   * liste d'ingrédients → lue par Claude ; sinon le produit est reconnu. Puis, dès que le produit est identifié,
+   * recherche internet (preuves, bases, historique, marque, avis) en fond. Le verdict PFAS vient de nos règles.
    */
-  async function lireAvecClaude(image: Blob) {
+  async function traiterPhoto(image: Blob, pleineDefinition?: CanvasImageSource) {
     if (!codeAcces()) {
       setEcran({ nom: 'code', image })
       return
     }
-    const images = completer.current ? [...photos.current, image].slice(-4) : [image]
-    const apercu = URL.createObjectURL(image)
-    setEcran({ nom: 'lecture-ia', apercu })
-    const code = produit?.code ?? codeInconnu
+    const n = ++jeton.current
+    const ajout = completer.current
+    const images = ajout ? [...photos.current, image].slice(-4) : [image]
+    if (!ajout) {
+      libererPhoto()
+      photoProduit.current = URL.createObjectURL(image)
+    }
+    setEcran({ nom: 'lecture-ia', apercu: photoProduit.current ?? URL.createObjectURL(image) })
     try {
-      const [rep, r] = await Promise.all([analyserPhotos(images, code), chargerRessources()])
+      // 1. Code-barres sur la photo, lu dans le téléphone (gratuit)
+      let code = ajout ? (produit?.code ?? codeInconnu) : undefined
+      if (!ajout && pleineDefinition) code = (await lireCode(pleineDefinition).catch(() => null)) ?? undefined
+      // 2. En même temps : Claude lit la photo, et la base ouverte est interrogée si un code a été lu
+      const [rep, trouve, r] = await Promise.all([
+        analyserPhotos(images, code),
+        !ajout && code ? chercherProduit(code).catch(() => null) : Promise.resolve(null),
+        chargerRessources(),
+      ])
+      if (jeton.current !== n) return
       photos.current = images
       completer.current = false
       setConsigne(undefined)
-      if (rep.mode === 'recherche') {
-        setEcran({ nom: 'resultat', resultat: analyseRecherche(rep.recherche, r, rep.depuis_memoire) })
-      } else if (rep.mode === 'produit' && rep.etiquette.produit?.nom) {
-        const p = rep.etiquette.produit
-        setEcran({ nom: 'recherche-en-cours', apercu, produit: [p.marque, p.nom].filter(Boolean).join(' ') })
-        const rech = await rechercherProduit({ marque: p.marque, nom: p.nom!, categorie: p.categorie }, code)
-        setEcran({ nom: 'resultat', resultat: analyseRecherche(rech.recherche, r, rech.depuis_memoire) })
-      } else {
-        setEcran({ nom: 'resultat', resultat: analyseIA(rep.etiquette, r), nomLu: rep.etiquette.nom_produit ?? undefined })
+      const pBase = trouve?.produit ?? (ajout ? produit : undefined)
+      setProduit(pBase ?? undefined)
+      setCodeInconnu(code && !pBase ? code : undefined)
+
+      const et = rep.etiquette
+      let res: Resultat | null = null
+      if (et.liste_trouvee && et.ingredients.length) res = analyseIA(et, r)
+      else if (pBase?.ingredients)
+        res = analyse(pBase.ingredients, { source: pBase.base.id, categories: pBase.categories, nomProduit: pBase.nom }, r)
+      const pc = et.produit
+      const identite = pBase?.nom
+        ? { marque: pBase.marque ?? null, nom: pBase.nom, categorie: pc?.categorie ?? null }
+        : pc?.identifiable && pc.nom && pc.confiance !== 'faible'
+          ? { marque: pc.marque, nom: pc.nom, categorie: pc.categorie }
+          : null
+      const extra = { photo: photoProduit.current, nomLu: et.nom_produit ?? undefined }
+
+      // Déjà recherché (mémoire partagée) : tout s'affiche d'un coup
+      if (rep.recherche) {
+        const final = res ? ajouterRecherche(res, rep.recherche, true) : analyseRecherche(rep.recherche, r, true)
+        setEcran({ nom: 'resultat', resultat: final, ...extra })
+        return
+      }
+      if (!identite) {
+        setEcran({ nom: 'resultat', resultat: res ?? analyseIA(et, r), ...extra, rechercheEtat: 'aucune' })
+        return
+      }
+      if (res) setEcran({ nom: 'resultat', resultat: res, ...extra, rechercheEtat: 'en_cours' })
+      else setEcran({ nom: 'recherche-en-cours', apercu: photoProduit.current, produit: [identite.marque, identite.nom].filter(Boolean).join(' ') })
+      try {
+        const rech = await rechercherProduit(identite, code, !!res)
+        if (jeton.current !== n) return
+        const final = res ? ajouterRecherche(res, rech.recherche, rech.depuis_memoire) : analyseRecherche(rech.recherche, r, rech.depuis_memoire)
+        setEcran({ nom: 'resultat', resultat: final, ...extra })
+      } catch (e) {
+        if (jeton.current !== n) return
+        if (res) setEcran({ nom: 'resultat', resultat: res, ...extra, rechercheEtat: 'erreur' })
+        else throw e
       }
     } catch (e) {
+      if (jeton.current !== n) return
       if (e instanceof ErreurRelais && e.type === 'code') {
         enregistrerCode(null)
         setEcran({ nom: 'code', image, erreur: true })
       } else {
         setEcran({ nom: 'erreur-ia', message: e instanceof ErreurRelais ? e.message : T.ia.erreur, image })
       }
-    } finally {
-      URL.revokeObjectURL(apercu)
     }
   }
+
+  // En développement seulement : porte d'entrée pour tester le parcours photo sans caméra
+  if (import.meta.env.DEV) (window as unknown as { __traiterPhoto: typeof traiterPhoto }).__traiterPhoto = traiterPhoto
 
   /** Photo prise avec l'appareil photo du téléphone (quand la caméra en direct n'est pas disponible) */
   async function surPhotoEtiquette(e: Event) {
@@ -216,8 +311,7 @@ export function App() {
     try {
       const img = await chargerImage(fichier)
       const image = await preparerImage(img, img.naturalWidth, img.naturalHeight)
-      URL.revokeObjectURL(img.src)
-      lireAvecClaude(image)
+      traiterPhoto(image, img)
     } catch {
       setEcran({ nom: 'erreur', message: 'Impossible d’ouvrir cette photo.' })
     }
@@ -266,9 +360,7 @@ export function App() {
       contenu = (
         <EcranScan
           consigne={consigne?.texte}
-          ignorer={consigne?.ignorer}
-          surCode={surCode}
-          onEtiquette={lireAvecClaude}
+          onPhoto={traiterPhoto}
           onOublierConsigne={() => setConsigne(undefined)}
           onSaisir={() => vers({ nom: 'saisie' })}
           onSources={() => vers({ nom: 'sources' })}
@@ -296,7 +388,7 @@ export function App() {
           erreur={!!ecran.erreur}
           onValider={(code) => {
             enregistrerCode(code)
-            if (ecran.image) lireAvecClaude(ecran.image)
+            if (ecran.image) traiterPhoto(ecran.image)
             else accueil()
           }}
           onRetour={accueil}
@@ -311,7 +403,7 @@ export function App() {
             <p>{ecran.message}</p>
           </div>
           <footer class="actions">
-            <button class="bouton principal" onClick={() => lireAvecClaude(ecran.image)}>
+            <button class="bouton principal" onClick={() => traiterPhoto(ecran.image)}>
               {T.boutons.reessayer}
             </button>
             <button class="bouton secondaire" onClick={() => lireSurLeTelephone(ecran.image)}>
@@ -367,6 +459,8 @@ export function App() {
           resultat={ecran.resultat}
           produit={produit}
           nomLu={ecran.nomLu}
+          photo={ecran.photo}
+          rechercheEtat={ecran.rechercheEtat}
           onAutre={accueil}
           onCorriger={() => vers({ nom: 'texte', texte: ecran.texte ?? '', source: ecran.resultat.source === 'photo' ? 'photo' : 'texte' })}
           onLireEtiquette={() => versEtiquette()}
@@ -405,24 +499,16 @@ export function App() {
 
 function EcranScan(props: {
   consigne?: string
-  /** Code-barres à ignorer (celui du produit dont on photographie la liste) */
-  ignorer?: string
-  surCode: (c: string) => void
-  onEtiquette: (image: Blob) => void
+  onPhoto: (image: Blob, pleineDefinition?: CanvasImageSource) => void
   onOublierConsigne: () => void
   onSaisir: () => void
   onSources: () => void
 }) {
   const video = useRef<HTMLVideoElement>(null)
   const camera = useRef<Camera | null>(null)
-  // Toujours les valeurs à jour dans le rappel de la caméra, qui tourne en continu
-  const surCodeActuel = useRef(props.surCode)
-  surCodeActuel.current = props.surCode
-  const ignorerActuel = useRef(props.ignorer)
-  ignorerActuel.current = props.ignorer
-  const [etat, setEtat] = useState<'demarrage' | 'actif' | 'lu' | 'refus' | 'indisponible'>('demarrage')
-  const [message, setMessage] = useState('')
+  const [etat, setEtat] = useState<'demarrage' | 'actif' | 'refus' | 'indisponible'>('demarrage')
   const [capture, setCapture] = useState(false)
+  const [message, setMessage] = useState('')
 
   useEffect(() => {
     let annule = false
@@ -430,17 +516,12 @@ function EcranScan(props: {
       setEtat('indisponible')
       return
     }
-    demarrerCamera(video.current!, (code) => {
-      if (ignorerActuel.current === code) return false
-      setEtat('lu')
-      bip()
-      setTimeout(() => surCodeActuel.current(code), 350)
-    })
+    demarrerCamera(video.current!)
       .then((c) => {
         if (annule) c.arreter()
         else {
           camera.current = c
-          setEtat((e) => (e === 'lu' ? e : 'actif'))
+          setEtat('actif')
         }
       })
       .catch((err: { name?: string }) => {
@@ -458,40 +539,18 @@ function EcranScan(props: {
     debloquerSon()
     setCapture(true)
     try {
-      const image = await camera.current.capturer()
-      props.onEtiquette(image)
+      const photo = await camera.current.capturer()
+      props.onPhoto(photo.image, photo.toile)
     } catch {
       setMessage(T.scan.captureRatee)
       setCapture(false)
     }
   }
 
-  async function surPhotoCode(e: Event) {
-    const entree = e.currentTarget as HTMLInputElement
-    const fichier = entree.files?.[0]
-    entree.value = ''
-    if (!fichier) return
-    setMessage('Lecture du code-barres…')
-    try {
-      const image = await chargerImage(fichier)
-      const code = await lireCode(image)
-      URL.revokeObjectURL(image.src)
-      if (code) props.surCode(code)
-      else setMessage(T.scan.aucunCode)
-    } catch {
-      setMessage(T.scan.aucunCode)
-    }
-  }
-
   const sansCamera = etat === 'refus' || etat === 'indisponible'
   let texte = message
-  if (!texte) {
-    if (etat === 'demarrage') texte = T.scan.demarrage
-    else if (etat === 'actif') texte = props.consigne ? '' : T.scan.viser
-    else if (etat === 'lu') texte = T.scan.lu
-    else if (etat === 'refus') texte = T.scan.refus
-    else texte = T.scan.indisponible
-  }
+  if (!texte && etat === 'refus') texte = T.scan.refus
+  else if (!texte && etat === 'indisponible') texte = T.scan.indisponible
 
   return (
     <div class="ecran scan">
@@ -500,9 +559,14 @@ function EcranScan(props: {
         <span class="titre-appli">
           {T.appli} <small class="version">version du {__VERSION__}</small>
         </span>
-        <button class="lien-clair" onClick={props.onSources}>
-          {T.boutons.sources}
-        </button>
+        <span class="liens-entete">
+          <button class="lien-clair" onClick={props.onSaisir}>
+            {T.boutons.saisirCodeCourt}
+          </button>
+          <button class="lien-clair" onClick={props.onSources}>
+            {T.boutons.sources}
+          </button>
+        </span>
       </header>
       {props.consigne && (
         <div class="consigne" role="status">
@@ -512,37 +576,19 @@ function EcranScan(props: {
           </button>
         </div>
       )}
-      {!sansCamera && (
-        <div class="viseur" aria-hidden="true">
-          <div class={`cadre${etat === 'lu' ? ' lu' : ''}`} />
-        </div>
-      )}
-      {texte && (
-        <p class={`scan-message${sansCamera ? ' fort' : ''}`} role="status">
-          {texte}
-        </p>
-      )}
-      <footer class="actions sombre">
+      <div class="scan-espace">{texte && <p class="scan-message fort">{texte}</p>}</div>
+      <footer class="zone-declencheur">
         {sansCamera ? (
-          <>
-            <label for="entree-etiquette" class="bouton principal">
-              {T.boutons.photoEtiquette}
-            </label>
-            <label for="entree-photo-code" class="bouton secondaire">
-              {T.scan.photoCode}
-            </label>
-          </>
+          <label for="entree-etiquette" class="bouton-photo" aria-label={T.boutons.photo}>
+            <span />
+          </label>
         ) : (
-          <button class="bouton principal declencheur" disabled={etat !== 'actif' || capture} onClick={declencher}>
-            <span class="pastille-photo" aria-hidden="true" />
-            {capture ? T.scan.capture : T.boutons.lireEtiquette}
+          <button class="bouton-photo" disabled={etat !== 'actif' || capture} onClick={declencher} aria-label={T.boutons.photo}>
+            <span />
           </button>
         )}
-        <button class="bouton secondaire" onClick={props.onSaisir}>
-          {T.boutons.saisirCode}
-        </button>
+        <small>{capture ? T.scan.capture : T.scan.aide}</small>
       </footer>
-      <input id="entree-photo-code" type="file" accept="image/*" capture="environment" class="cache" onChange={surPhotoCode} />
     </div>
   )
 }
