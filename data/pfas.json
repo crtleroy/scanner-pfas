@@ -1,0 +1,735 @@
+{
+ "source": {
+  "nom": "CosIng (Commission européenne), via la base d’ingrédients d’Open Beauty Facts",
+  "url": "https://static.openbeautyfacts.org/data/taxonomies/ingredients.json",
+  "licence": "ODbL",
+  "date": "2026-11-08"
+ },
+ "methode": "Noms INCI de CosIng contenant du fluor, classés selon la définition OCDE 2021 (au moins un CF2 ou CF3 sans H, Cl, Br ni I), revus à la main le 08/11/2026. À recouper avec les listes EPA (étape 4).",
+ "pfas": [
+  {
+   "n": "ACETYL TRIFLUOROMETHYLPHENYL VALYLGLYCINE",
+   "cas": "379685-96-8",
+   "f": "cf3"
+  },
+  {
+   "n": "ACRYLATES/METHOXY PEG-23 METHACRYLATE/PERFLUOROOCTYL ETHYL ACRYLATE COPOLYMER",
+   "f": "copolymeres"
+  },
+  {
+   "n": "ACRYLATES/PERFLUOROHEXYLETHYL METHACRYLATE COPOLYMER",
+   "cas": "1557087-30-5",
+   "f": "copolymeres"
+  },
+  {
+   "n": "ACRYLATES/TRIFLUOROPROPYLMETHACRYLATE/POLYTRIMETHYL SILOXYMETHACRYLATE COPOLYMER",
+   "f": "copolymeres"
+  },
+  {
+   "n": "ACRYLIC ACID/PERFLUOROHEXYLETHYL ACRYLATE CROSSPOLYMER",
+   "cas": "1820790-78-0",
+   "f": "copolymeres"
+  },
+  {
+   "n": "ADAMANTANYLCARBOXAMIDO TRIFLUOROMETHYLBENZONITRILE",
+   "f": "cf3"
+  },
+  {
+   "n": "AMMONIUM C6-16 PERFLUOROALKYLETHYL PHOSPHATE",
+   "cas": "65530-72-5 / 65530-71-4 / 65530-70-3",
+   "f": "phosphates"
+  },
+  {
+   "n": "AMMONIUM C9-10 PERFLUOROALKYLSULFONATE",
+   "f": "phosphates"
+  },
+  {
+   "n": "AMMONIUM PERFLUOROHEXYL ETHYLPHOSPHATES",
+   "f": "phosphates"
+  },
+  {
+   "n": "AMP-C8-18 PERFLUOROALKYLETHYL PHOSPHATE",
+   "f": "phosphates"
+  },
+  {
+   "n": "BEHENYL METHACRYLATE/PERFLUOROOCTYLETHYL METHACRYLATE COPOLYMER",
+   "f": "copolymeres"
+  },
+  {
+   "n": "BIOTINOYL HISTIDYL D-TRYPTOPHANYL DIPEPTIDE-29 D-PHENYLALANYL LYSINAMIDE TRIFLUOROACETATE",
+   "cas": "1894171-15-3",
+   "f": "cf3"
+  },
+  {
+   "n": "BUTYL ACRYLATE/C6-14 PERFLUOROALKYLETHYL ACRYLATE/MERCAPTOPROPYL DIMETHICONE COPOLYMER",
+   "f": "silicones"
+  },
+  {
+   "n": "C20-28 ALKYL PERFLUORODECYLETHOXY DIMETHICONE",
+   "f": "silicones"
+  },
+  {
+   "n": "C4-14 PERFLUOROALKYLETHOXY DIMETHICONE",
+   "f": "silicones"
+  },
+  {
+   "n": "C4-18 PERFLUOROALKYLETHYL THIOHYDROXYPROPYLTRIMONIUM CHLORIDE",
+   "cas": "70983-60-7",
+   "f": "ethers_alcanes"
+  },
+  {
+   "n": "C6-12 PERFLUOROALKYLETHANOL",
+   "f": "phosphates"
+  },
+  {
+   "n": "C6-14 PERFLUOROALKYLETHYL ACRYLATE/HEMA COPOLYMER",
+   "f": "copolymeres"
+  },
+  {
+   "n": "C8-18 FLUOROALCOHOL PHOSPHATE",
+   "f": "phosphates"
+  },
+  {
+   "n": "C9-13 FLUOROALCOHOL",
+   "f": "phosphates"
+  },
+  {
+   "n": "C9-15 FLUOROALCOHOL PHOSPHATE",
+   "cas": "223239-92-7",
+   "f": "phosphates"
+  },
+  {
+   "n": "CALCIUM TRIFLUOROACETATE",
+   "cas": "60884-90-4",
+   "f": "cf3"
+  },
+  {
+   "n": "CHLOROTRIFLUOROPROPENE",
+   "cas": "102687-65-0",
+   "f": "gaz"
+  },
+  {
+   "n": "DEA-PERFLUOROHEXYL ETHYLPHOSPHATES",
+   "f": "phosphates"
+  },
+  {
+   "n": "DIETHYLAMINOETHYL METHACRYLATE/HEMA/PERFLUOROHEXYLETHYL METHACRYLATE CROSSPOLYMER",
+   "f": "copolymeres"
+  },
+  {
+   "n": "DIMETHICONOL FLUOROALCOHOL DILINOLEIC ACID",
+   "f": "silicones"
+  },
+  {
+   "n": "DIOCTYLDODECYL FLUOROHEPTYL CITRATE",
+   "f": "autre"
+  },
+  {
+   "n": "ETHYL PERFLUOROBUTYL ETHER",
+   "cas": "163702-05-4",
+   "f": "ethers_alcanes"
+  },
+  {
+   "n": "ETHYL PERFLUOROISOBUTYL ETHER",
+   "cas": "163702-06-5",
+   "f": "ethers_alcanes"
+  },
+  {
+   "n": "EUROPIUM TRIS(TRIFLUOROTHIENYLBUTANEDIONE) BIS(TRIPHENYLPHOSPHINE OXIDE)",
+   "cas": "120851-64-1",
+   "f": "cf3"
+  },
+  {
+   "n": "FLUORO C2-8 ALKYLDIMETHICONE",
+   "f": "silicones"
+  },
+  {
+   "n": "FLUOROSALAN",
+   "cas": "4776-06-1",
+   "f": "autre"
+  },
+  {
+   "n": "HEXAFLUOROPROPYLENE/TETRAFLUOROETHYLENE COPOLYMER",
+   "f": "fluoropolymeres"
+  },
+  {
+   "n": "HYDROFLUOROCARBON 227EA",
+   "cas": "431-89-0",
+   "f": "gaz"
+  },
+  {
+   "n": "HYDROGEN TRIFLUOROPROPYL DIMETHICONE",
+   "cas": "766542-38-5",
+   "f": "silicones"
+  },
+  {
+   "n": "ISOBUTYLMETHACRYLATE/TRIFLUOROETHYLMETHACRYLATE/BIS-HYDROXYPROPYL DIMETHICONE ACRYLATE COPOLYMER",
+   "cas": "321735-42-6",
+   "f": "silicones"
+  },
+  {
+   "n": "ISODODECYL/PERFLUORONONYLETHYL DIMER DILINOLEATE/CITRATE",
+   "f": "ethers_alcanes"
+  },
+  {
+   "n": "ISOPROPYL TITANIUM TRIISOSTEARATE/PERFLUOROOCTYL TRIETHOXYSILANE CROSSPOLYMER",
+   "f": "silicones"
+  },
+  {
+   "n": "METHYL PERFLUORO BUTYL/ISOBUTYL ETHER",
+   "cas": "163702-07-6",
+   "f": "ethers_alcanes"
+  },
+  {
+   "n": "METHYL PERFLUOROBUTYL ETHER",
+   "cas": "163702-07-6",
+   "f": "ethers_alcanes"
+  },
+  {
+   "n": "METHYL PERFLUOROISOBUTYL ETHER",
+   "cas": "163702-08-7",
+   "f": "ethers_alcanes"
+  },
+  {
+   "n": "OCTAFLUOROPENTYL METHACRYLATE",
+   "cas": "355-93-1",
+   "f": "copolymeres"
+  },
+  {
+   "n": "OCTAPEPTIDE-29 TRIFLUOROACETATE",
+   "f": "cf3"
+  },
+  {
+   "n": "PEG-10 ACRYLATE/PERFLUOROHEXYLETHYL ACRYLATE COPOLYMER",
+   "f": "copolymeres"
+  },
+  {
+   "n": "PEG-10 NONAFLUOROHEXYL DIMETHICONE COPOLYMER",
+   "f": "silicones"
+  },
+  {
+   "n": "PEG-10 TRIFLUOROPROPYL DIMETHICONE COPOLYMER",
+   "f": "silicones"
+  },
+  {
+   "n": "PEG-4 TRIFLUOROPROPYL DIMETHICONE COPOLYMER",
+   "f": "silicones"
+  },
+  {
+   "n": "PEG-8 TRIFLUOROPROPYL DIMETHICONE COPOLYMER",
+   "f": "silicones"
+  },
+  {
+   "n": "PENTAFLUOROPROPANE",
+   "cas": "460-73-1",
+   "f": "gaz"
+  },
+  {
+   "n": "PENTAPEPTIDE-34 TRIFLUOROACETATE",
+   "f": "cf3"
+  },
+  {
+   "n": "PERFLUORO DIMETHYLETHYLPENTANE",
+   "cas": "502858-18-2",
+   "f": "ethers_alcanes"
+  },
+  {
+   "n": "PERFLUORO T-BUTYLCYCLOHEXANE",
+   "cas": "84808-64-0",
+   "f": "ethers_alcanes"
+  },
+  {
+   "n": "PERFLUOROALKYLSILYL MICA",
+   "f": "silicones"
+  },
+  {
+   "n": "PERFLUOROBUTYLCYCLOHEXANE",
+   "cas": "374-60-7",
+   "f": "ethers_alcanes"
+  },
+  {
+   "n": "PERFLUOROCAPRYLYL BROMIDE",
+   "cas": "423-55-2",
+   "f": "ethers_alcanes"
+  },
+  {
+   "n": "PERFLUOROCAPRYLYL TRIETHOXYSILYLETHYL METHICONE",
+   "f": "silicones"
+  },
+  {
+   "n": "PERFLUOROCYCLOHEXYLMETHANOL",
+   "cas": "28788-68-3",
+   "f": "ethers_alcanes"
+  },
+  {
+   "n": "PERFLUORODECALIN",
+   "cas": "306-94-5",
+   "f": "ethers_alcanes"
+  },
+  {
+   "n": "PERFLUORODIMETHYLCYCLOHEXANE",
+   "cas": "335-27-3",
+   "f": "ethers_alcanes"
+  },
+  {
+   "n": "PERFLUOROHEPTANE",
+   "cas": "335-57-9",
+   "f": "ethers_alcanes"
+  },
+  {
+   "n": "PERFLUOROHEXANE",
+   "cas": "355-42-0",
+   "f": "ethers_alcanes"
+  },
+  {
+   "n": "PERFLUOROHEXYL ETHYLPHOSPHONIC ACID",
+   "cas": "252237-40-4",
+   "f": "phosphates"
+  },
+  {
+   "n": "PERFLUOROHEXYLETHYL DIMETHYLBUTYL ETHER",
+   "cas": "210896-25-6",
+   "f": "ethers_alcanes"
+  },
+  {
+   "n": "PERFLUOROISOHEXANE",
+   "cas": "355-04-4",
+   "f": "ethers_alcanes"
+  },
+  {
+   "n": "PERFLUOROMETHYLCYCLOHEXANE",
+   "cas": "355-02-2",
+   "f": "ethers_alcanes"
+  },
+  {
+   "n": "PERFLUOROMETHYLCYCLOPENTANE",
+   "cas": "1805-22-7",
+   "f": "ethers_alcanes"
+  },
+  {
+   "n": "PERFLUOROMETHYLDECALIN",
+   "cas": "51294-16-7",
+   "f": "ethers_alcanes"
+  },
+  {
+   "n": "PERFLUORONONYL DIMETHICONE",
+   "f": "silicones"
+  },
+  {
+   "n": "PERFLUORONONYL DIMETHICONE/METHICONE/AMODIMETHICONE CROSSPOLYMER",
+   "f": "silicones"
+  },
+  {
+   "n": "PERFLUORONONYL OCTYLDODECYL GLYCOL GRAPESEEDATE",
+   "f": "ethers_alcanes"
+  },
+  {
+   "n": "PERFLUORONONYL OCTYLDODECYL GLYCOL MEADOWFOAMATE",
+   "f": "ethers_alcanes"
+  },
+  {
+   "n": "PERFLUORONONYLETHYL CARBOXY PEG-7 DIMETHICONE PHOSPHATE",
+   "f": "silicones"
+  },
+  {
+   "n": "PERFLUORONONYLETHYL CARBOXYDECYL BEHENYL DIMETHICONE",
+   "f": "silicones"
+  },
+  {
+   "n": "PERFLUORONONYLETHYL CARBOXYDECYL HEXACOSYL DIMETHICONE",
+   "f": "silicones"
+  },
+  {
+   "n": "PERFLUORONONYLETHYL CARBOXYDECYL LAURYL DIMETHICONE",
+   "f": "silicones"
+  },
+  {
+   "n": "PERFLUORONONYLETHYL CARBOXYDECYL LAURYL/BEHENYL DIMETHICONE",
+   "f": "silicones"
+  },
+  {
+   "n": "PERFLUORONONYLETHYL CARBOXYDECYL PEG-10 DIMETHICONE",
+   "f": "silicones"
+  },
+  {
+   "n": "PERFLUORONONYLETHYL CARBOXYDECYL PEG-8 DIMETHICONE",
+   "f": "silicones"
+  },
+  {
+   "n": "PERFLUORONONYLETHYL DIMETHICONE/METHICONE COPOLYMER",
+   "f": "silicones"
+  },
+  {
+   "n": "PERFLUORONONYLETHYL PEG-8 DIMETHICONE",
+   "f": "silicones"
+  },
+  {
+   "n": "PERFLUORONONYLETHYL PEG-8 PHENYLISOPROPYL DIMETHCONE",
+   "f": "ethers_alcanes"
+  },
+  {
+   "n": "PERFLUORONONYLETHYL STEARYL DIMETHICONE",
+   "f": "silicones"
+  },
+  {
+   "n": "PERFLUOROOCTYL TRIETHOXYSILANE",
+   "cas": "51851-37-7",
+   "f": "silicones"
+  },
+  {
+   "n": "PERFLUOROOCTYLETHYL TRIETHOXYSILANE",
+   "cas": "101947-16-4",
+   "f": "silicones"
+  },
+  {
+   "n": "PERFLUOROOCTYLETHYL TRIMETHOXYSILANE",
+   "cas": "83048-65-1",
+   "f": "silicones"
+  },
+  {
+   "n": "PERFLUOROOCTYLETHYL TRISILOXANE",
+   "cas": "163921-85-5",
+   "f": "silicones"
+  },
+  {
+   "n": "PERFLUOROOCTYLETHYL/DIPHENYL DIMETHICONE COPOLYMER",
+   "f": "silicones"
+  },
+  {
+   "n": "PERFLUOROPERHYDROBENZYL TETRALIN",
+   "cas": "116265-66-8",
+   "f": "ethers_alcanes"
+  },
+  {
+   "n": "PERFLUOROPERHYDROFLUORENE",
+   "cas": "307-08-4",
+   "f": "ethers_alcanes"
+  },
+  {
+   "n": "PERFLUOROPERHYDROPHENANTHRENE",
+   "cas": "306-91-2",
+   "f": "ethers_alcanes"
+  },
+  {
+   "n": "PERFLUOROPROPANE",
+   "cas": "76-19-7",
+   "f": "gaz"
+  },
+  {
+   "n": "PERFLUOROTETRALIN",
+   "cas": "2342-07-6",
+   "f": "ethers_alcanes"
+  },
+  {
+   "n": "POLYCHLOROTRIFLUOROETHYLENE",
+   "cas": "9002-83-9",
+   "f": "fluoropolymeres"
+  },
+  {
+   "n": "POLYPERFLUOROETHOXYMETHOXY DIFLUOROETHYL PEG DIISOSTEARATE",
+   "f": "ethers_alcanes"
+  },
+  {
+   "n": "POLYPERFLUOROETHOXYMETHOXY DIFLUOROETHYL PEG ETHER",
+   "cas": "162492-15-1 / 88645-29-8",
+   "f": "ethers_alcanes"
+  },
+  {
+   "n": "POLYPERFLUOROETHOXYMETHOXY DIFLUOROETHYL PEG PHOSPHATE",
+   "f": "phosphates"
+  },
+  {
+   "n": "POLYPERFLUOROETHOXYMETHOXY DIFLUOROHYDROXYETHYL ETHER",
+   "f": "ethers_alcanes"
+  },
+  {
+   "n": "POLYPERFLUOROETHOXYMETHOXY DIFLUOROMETHYL DISTEARAMIDE",
+   "cas": "220207-10-3",
+   "f": "ethers_alcanes"
+  },
+  {
+   "n": "POLYPERFLUOROETHOXYMETHOXY DIFLUOROMETHYL ETHER",
+   "cas": "161075-02-1",
+   "f": "ethers_alcanes"
+  },
+  {
+   "n": "POLYPERFLUOROETHOXYMETHOXY PEG-2 PHOSPHATE",
+   "cas": "162567-74-0",
+   "f": "phosphates"
+  },
+  {
+   "n": "POLYPERFLUOROISOPROPYL ETHER",
+   "f": "ethers_alcanes"
+  },
+  {
+   "n": "POLYPERFLUOROMETHYLISOPROPYL ETHER",
+   "cas": "69991-67-9",
+   "f": "ethers_alcanes"
+  },
+  {
+   "n": "POLYPERFLUOROPERHYDROPHENANTHRENE",
+   "cas": "159182-00-0",
+   "f": "ethers_alcanes"
+  },
+  {
+   "n": "POLYTETRAFLUOROETHYLENE",
+   "f": "fluoropolymeres"
+  },
+  {
+   "n": "POLYTETRAFLUOROETHYLENE ACETOXYPROPYL BETAINE",
+   "cas": "123171-68-6",
+   "f": "fluoropolymeres"
+  },
+  {
+   "n": "POLYVINYLIDENE DIFLUORIDE",
+   "cas": "24937-79-9",
+   "f": "fluoropolymeres"
+  },
+  {
+   "n": "POLYVINYLIDENE FLUORIDE",
+   "f": "fluoropolymeres"
+  },
+  {
+   "n": "POTASSIUM PERFLUOROHEXYL ETHYLPHOSPHATE",
+   "cas": "1224952-82-2",
+   "f": "phosphates"
+  },
+  {
+   "n": "PTFE",
+   "cas": "9002-84-0",
+   "f": "fluoropolymeres"
+  },
+  {
+   "n": "PVDF",
+   "f": "fluoropolymeres"
+  },
+  {
+   "n": "SH-OLIGOPEPTIDE-73 AMIDE TRIFLUOROACETATE",
+   "f": "cf3"
+  },
+  {
+   "n": "SH-TETRAPEPTIDE-38 TRIFLUOROACETATE",
+   "f": "cf3"
+  },
+  {
+   "n": "SODIUM FORMYLHIPPURATE TRIFLUOROACETYLISOBUTYL DIPEPTIDE-42 AMIDE",
+   "cas": "144055-55-0",
+   "f": "cf3"
+  },
+  {
+   "n": "SODIUM PERFLUOROHEXYL ETHYLPHOSPHONATE",
+   "cas": "1189052-95-6",
+   "f": "phosphates"
+  },
+  {
+   "n": "STEARYL METHACRYLATE/PERFLUOROOCTYLETHYL METHACRYLATE COPOLYMER",
+   "f": "copolymeres"
+  },
+  {
+   "n": "TEA-C8-18 PERFLUOROALKYLETHYL PHOSPHATE",
+   "f": "phosphates"
+  },
+  {
+   "n": "TEA-PERFLUOROHEXYL ETHYLPHOSPHATES",
+   "f": "phosphates"
+  },
+  {
+   "n": "TEFLON",
+   "f": "fluoropolymeres"
+  },
+  {
+   "n": "TETRADECYL AMINOBUTYROYLVALYLAMINOBUTYRIC UREA TRIFLUOROACETATE",
+   "cas": "934368-60-2",
+   "f": "cf3"
+  },
+  {
+   "n": "TETRAFLUOROETHANE",
+   "f": "gaz"
+  },
+  {
+   "n": "TRIFLUOROACETYL TRIPEPTIDE-2",
+   "f": "cf3"
+  },
+  {
+   "n": "TRIFLUOROMETHYL C1-4 ALKYL DIMETHICONE",
+   "f": "silicones"
+  },
+  {
+   "n": "TRIFLUOROMETHYL DECHLORO ETHYLCLOPROSTENOLAMIDE",
+   "cas": "1005193-64-5",
+   "f": "cf3"
+  },
+  {
+   "n": "TRIFLUOROMETHYL DEHYDROLATANOPROST",
+   "f": "cf3"
+  },
+  {
+   "n": "TRIFLUOROMETHYLBIPYRIDYL BROMOBENZIMIDAZOLE",
+   "f": "cf3"
+  },
+  {
+   "n": "TRIFLUOROPROPYL CYCLOPENTASILOXANE",
+   "f": "silicones"
+  },
+  {
+   "n": "TRIFLUOROPROPYL CYCLOTETRASILOXANE",
+   "cas": "429-67-4",
+   "f": "silicones"
+  },
+  {
+   "n": "TRIFLUOROPROPYL CYCLOTRISILOXANE",
+   "cas": "2374-14-3",
+   "f": "silicones"
+  },
+  {
+   "n": "TRIFLUOROPROPYL DIMETHICONE",
+   "f": "silicones"
+  },
+  {
+   "n": "TRIFLUOROPROPYL DIMETHICONE/PEG-10 CROSSPOLYMER",
+   "f": "silicones"
+  },
+  {
+   "n": "TRIFLUOROPROPYL DIMETHICONE/TRIFLUOROPROPYL DIVINYLDIMETHICONE CROSSPOLYMER",
+   "f": "silicones"
+  },
+  {
+   "n": "TRIFLUOROPROPYL DIMETHICONE/VINYL TRIFLUOROPROPYL DIMETHICONE/SILSESQUIOXANE CROSSPOLYMER",
+   "f": "silicones"
+  },
+  {
+   "n": "TRIFLUOROPROPYL DIMETHICONOL",
+   "f": "silicones"
+  },
+  {
+   "n": "TRIFLUOROPROPYL METHICONE",
+   "f": "silicones"
+  },
+  {
+   "n": "TRIFLUOROPROPYLDIMETHYL/TRIMETHYLSILOXYSILICATE",
+   "f": "silicones"
+  },
+  {
+   "n": "TRIFLUOROPROPYLDIMETHYLSILOXY/TRIMETHYLSILOXY SILSESQUIOXANE",
+   "f": "silicones"
+  }
+ ],
+ "nonPfas": [
+  {
+   "n": "2-PROPANOL/BORON TRIFLUORIDE/ETHYLIDENEBICYCLOHEPTENE",
+   "r": "fluorure de bore, sans carbone fluoré"
+  },
+  {
+   "n": "4-FLUORO-6-METHYL-M-PHENYLENEDIAMINE SULFATE",
+   "r": "fluor sur un cycle aromatique ou isolé, sans CF2 ni CF3"
+  },
+  {
+   "n": "ACETYL MONOFLUOROHEPTAPEPTIDE-1",
+   "r": "fluor sur un cycle aromatique ou isolé, sans CF2 ni CF3"
+  },
+  {
+   "n": "ALUMINUM FLUORIDE",
+   "r": "fluorure (le fluor n’est pas lié à une chaîne carbonée)"
+  },
+  {
+   "n": "AMMONIUM FLUORIDE",
+   "r": "fluorure (le fluor n’est pas lié à une chaîne carbonée)"
+  },
+  {
+   "n": "AMMONIUM FLUOROSILICATE",
+   "r": "fluoro-sel minéral"
+  },
+  {
+   "n": "AMMONIUM MONOFLUOROPHOSPHATE",
+   "r": "fluoro-sel minéral"
+  },
+  {
+   "n": "CALCIUM FLUORIDE",
+   "r": "fluorure minéral"
+  },
+  {
+   "n": "CETYLAMINE HYDROFLUORIDE",
+   "r": "fluorure (le fluor n’est pas lié à une chaîne carbonée)"
+  },
+  {
+   "n": "DIFLUOROPHENYL PROPYLCYCLOPENTENE OXIME",
+   "r": "fluor sur un cycle aromatique ou isolé, sans CF2 ni CF3"
+  },
+  {
+   "n": "DIPHENYL ACETAMIDOTRICHLOROETHYL FLUORONITROPHENYL THIOUREA",
+   "r": "fluor sur un cycle aromatique ou isolé, sans CF2 ni CF3"
+  },
+  {
+   "n": "HYDROCHLOROFLUOROCARBON 142B",
+   "r": "gaz sans carbone entièrement fluoré"
+  },
+  {
+   "n": "HYDROCHLOROFLUOROCARBON 22",
+   "r": "gaz sans carbone entièrement fluoré"
+  },
+  {
+   "n": "ISOPROPYLCHROMENAMIDO FLUOROBENZYL METHANESULFONAMIDE",
+   "r": "fluor sur un cycle aromatique ou isolé, sans CF2 ni CF3"
+  },
+  {
+   "n": "MAGNESIUM FLUORIDE",
+   "r": "fluorure (le fluor n’est pas lié à une chaîne carbonée)"
+  },
+  {
+   "n": "MAGNESIUM POTASSIUM FLUOROSILICATE",
+   "r": "fluoro-sel minéral"
+  },
+  {
+   "n": "MAGNESIUM SODIUM FLUOROSILICATE",
+   "r": "fluoro-sel minéral"
+  },
+  {
+   "n": "OCTADECENYL-AMMONIUM FLUORIDE",
+   "r": "fluorure (le fluor n’est pas lié à une chaîne carbonée)"
+  },
+  {
+   "n": "OLAFLUR",
+   "r": "fluorure d’amine"
+  },
+  {
+   "n": "PEG-2 OLEAMINE HYDROFLUORIDE",
+   "r": "fluorure (le fluor n’est pas lié à une chaîne carbonée)"
+  },
+  {
+   "n": "PHENYLMETHYLSULFONYL FLUORIDE",
+   "r": "fluorure (le fluor n’est pas lié à une chaîne carbonée)"
+  },
+  {
+   "n": "POTASSIUM FLUORIDE",
+   "r": "fluorure minéral"
+  },
+  {
+   "n": "POTASSIUM FLUOROSILICATE",
+   "r": "fluoro-sel minéral"
+  },
+  {
+   "n": "SODIUM FLUORIDE",
+   "r": "fluorure minéral"
+  },
+  {
+   "n": "SODIUM FLUOROSILICATE",
+   "r": "fluoro-sel minéral"
+  },
+  {
+   "n": "SODIUM MAGNESIUM FLUOROSILICATE",
+   "r": "fluoro-sel minéral"
+  },
+  {
+   "n": "SODIUM MONOFLUOROPHOSPHATE",
+   "r": "fluoro-sel minéral"
+  },
+  {
+   "n": "STANNOUS FLUORIDE",
+   "r": "fluorure minéral"
+  },
+  {
+   "n": "T-BUTYLCHROMENAMIDO FLUOROBENZYL METHANESULFONAMIDE",
+   "r": "fluor sur un cycle aromatique ou isolé, sans CF2 ni CF3"
+  }
+ ]
+}
