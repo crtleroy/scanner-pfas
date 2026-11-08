@@ -2,7 +2,7 @@
 import type { ReponseIA } from './engine/ia.ts'
 
 /** Adresse du relais : VITE_RELAIS_URL (fichier .env) en développement, sinon le relais publié. */
-export const RELAIS_URL: string = import.meta.env.VITE_RELAIS_URL || 'https://scanner-pfas-relais.crtleroy.workers.dev'
+export const RELAIS_URL: string = import.meta.env.VITE_RELAIS_URL || 'https://scanner-pfas-relais.scanner-pfas-relais.workers.dev'
 
 const CLE_CODE = 'code-acces'
 
