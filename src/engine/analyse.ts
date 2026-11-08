@@ -5,8 +5,23 @@ import type { Dictionnaire } from './dictionnaire.ts'
 
 export type { IngredientAnalyse, Morceau } from './lecture.ts'
 
-/** 'ia' : photo lue par Claude via le relais ; 'photo' : photo lue par Tesseract dans le téléphone */
-export type Source = 'base_beaute' | 'base_alimentaire' | 'base_produits' | 'photo' | 'texte' | 'ia'
+/**
+ * 'ia' : photo lue par Claude via le relais ; 'recherche' : produit reconnu sur la photo puis cherché sur internet ;
+ * 'photo' : photo lue par Tesseract dans le téléphone
+ */
+export type Source = 'base_beaute' | 'base_alimentaire' | 'base_produits' | 'photo' | 'texte' | 'ia' | 'recherche'
+
+/** Ce que la recherche internet a rapporté, pour l'affichage */
+export interface InfosRecherche {
+  produit: { marque: string | null; nom: string; categorie: string | null }
+  sources: { titre: string; url: string }[]
+  indices: { fait: string; sens: 'presence' | 'absence' | 'incertain'; source: string | null }[]
+  contradictions: string[]
+  deduction: { niveau: 'probable' | 'possible' | 'peu_probable' | 'inconnu'; explication: string }
+  compositionTrouvee: boolean
+  recherches: number
+  depuisMemoire: boolean
+}
 export type Verdict = 'rouge' | 'orange' | 'vert' | 'gris'
 export type Confiance = 'élevée' | 'moyenne' | 'faible'
 
@@ -39,6 +54,12 @@ export interface Resultat {
   avertissement?: string
   /** Remarque de Claude sur la photo (liste dans une autre langue…) */
   remarque?: string
+  /** Type de produit ou catégorie quand on le connaît (« cosmetique », « poêle antiadhésive »…) */
+  typeProduit?: string
+  /** La liste lue sur la photo est coupée : proposer de la compléter */
+  listeIncomplete?: boolean
+  /** Résultat d'une recherche internet */
+  recherche?: InfosRecherche
   categorieARisque?: string
   familles: Famille[]
   source: Source

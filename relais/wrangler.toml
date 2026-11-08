@@ -4,5 +4,16 @@ main = "src/index.ts"
 compatibility_date = "2026-09-01"
 compatibility_flags = ["nodejs_compat"]
 
+# Modèles réglables séparément pour la lecture des photos et pour la recherche internet
+[vars]
+MODELE_PHOTO = "claude-haiku-5-5"
+MODELE_RECHERCHE = "claude-haiku-5-5"
+RECHERCHES_MAX = "4"
+
+# Mémoire partagée des recherches déjà faites (par produit et par code-barres)
+[[kv_namespaces]]
+binding = "MEMOIRE"
+id = "5af446bbb09246c9b8e7e567770296be"
+
 [observability]
 enabled = true

@@ -1,5 +1,5 @@
 // Envoi d'une photo d'étiquette au relais Cloudflare, qui la fait lire par Claude.
-import type { ReponseIA } from './engine/ia.ts'
+import type { ReponseIA, ReponseRecherche } from './engine/ia.ts'
 
 /** Adresse du relais : VITE_RELAIS_URL (fichier .env) en développement, sinon le relais publié. */
 export const RELAIS_URL: string = import.meta.env.VITE_RELAIS_URL || 'https://scanner-pfas-relais.scanner-pfas-relais.workers.dev'
@@ -69,21 +69,53 @@ export async function preparerImage(source: CanvasImageSource, largeur: number, 
   )
 }
 
-export async function lireEtiquette(image: Blob): Promise<ReponseIA> {
+/** Réponse du relais à « analyser » (une ou plusieurs photos) */
+export type ReponseAnalyse =
+  | { mode: 'liste'; etiquette: ReponseIA }
+  | { mode: 'produit'; etiquette: ReponseIA }
+  | { mode: 'recherche'; etiquette?: ReponseIA; recherche: ReponseRecherche; depuis_memoire: boolean }
+
+export type ReponseRecherchee = { mode: 'recherche'; recherche: ReponseRecherche; depuis_memoire: boolean }
+
+/** Photos d'un même produit → Claude lit la liste, ou reconnaît le produit */
+export async function analyserPhotos(images: Blob[], codeBarres?: string): Promise<ReponseAnalyse> {
+  const donnees = await Promise.all(images.map(enBase64))
+  return appeler({ action: 'analyser', images: donnees, type: images[0]?.type || 'image/jpeg', code_barres: codeBarres })
+}
+
+/** Produit reconnu → recherche internet (ou mémoire partagée) */
+export function rechercherProduit(
+  produit: { marque: string | null; nom: string; categorie: string | null },
+  codeBarres?: string,
+): Promise<ReponseRecherchee> {
+  return appeler({ action: 'rechercher', produit, code_barres: codeBarres })
+}
+
+/** Recherche déjà faite pour ce code-barres ? (gratuit) */
+export async function memoireCodeBarres(code: string): Promise<ReponseRecherchee | null> {
+  if (!codeAcces()) return null
+  try {
+    const rep = await appeler<ReponseRecherchee | { mode: 'aucun' }>({ action: 'memoire', code_barres: code })
+    return rep.mode === 'recherche' ? rep : null
+  } catch {
+    return null
+  }
+}
+
+async function appeler<T>(corps: Record<string, unknown>): Promise<T> {
   const code = codeAcces()
   if (!code) throw new ErreurRelais('code', MESSAGES.code)
-  const donnees = await enBase64(image)
   let rep: Response
   try {
     rep = await fetch(RELAIS_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Code-Acces': code },
-      body: JSON.stringify({ image: donnees, type: image.type || 'image/jpeg' }),
+      body: JSON.stringify(corps),
     })
   } catch {
     throw new ErreurRelais('reseau', MESSAGES.reseau)
   }
-  if (rep.ok) return (await rep.json()) as ReponseIA
+  if (rep.ok) return (await rep.json()) as T
   let type: TypeErreur = 'service'
   if (rep.status === 401) type = 'code'
   else if (rep.status === 429) type = 'limite'

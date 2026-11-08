@@ -911,3 +911,97 @@ details.carte summary {
   object-fit: contain;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
 }
+
+/* ---------- Recherche internet, gravité, contradictions (v4) ---------- */
+
+.completer {
+  width: 100%;
+  margin: 0.2rem 0 0.8rem;
+}
+.alerte-contradiction {
+  border: 2px solid var(--orange);
+  background: var(--orange-fond);
+  border-radius: var(--rayon);
+  padding: 0.7rem 0.9rem;
+  margin: 0.8rem 0;
+}
+.alerte-contradiction h2 {
+  margin: 0 0 0.3rem;
+  color: var(--orange);
+  font-size: 1rem;
+}
+.alerte-contradiction ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.95rem;
+}
+.gravite h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.gravite .jauge {
+  display: inline-flex;
+  gap: 3px;
+}
+.gravite .jauge span {
+  width: 10px;
+  height: 18px;
+  border-radius: 3px;
+  background: var(--bordure);
+}
+.gravite.faible .jauge span:nth-child(1),
+.gravite.moderee .jauge span:nth-child(-n + 2),
+.gravite.elevee .jauge span {
+  background: var(--rouge);
+}
+.gravite.faible .jauge span:nth-child(1) {
+  background: var(--orange);
+}
+.gravite details {
+  margin: 0.4rem 0;
+  font-size: 0.95rem;
+}
+.gravite details summary {
+  cursor: pointer;
+  color: var(--texte-doux);
+}
+.indices {
+  list-style: none;
+  padding: 0;
+  margin: 0.4rem 0 0;
+}
+.indices li {
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--bordure);
+  font-size: 0.95rem;
+}
+.indices li:last-child {
+  border-bottom: 0;
+}
+.indices .sens {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.1rem 0.45rem;
+  border-radius: 6px;
+  margin-right: 0.3rem;
+  background: var(--gris-fond);
+  color: var(--gris);
+}
+.indices .presence .sens {
+  background: var(--rouge-fond);
+  color: var(--rouge);
+}
+.indices .absence .sens {
+  background: var(--vert-fond);
+  color: var(--vert);
+}
+.indices a,
+.carte small {
+  color: var(--texte-doux);
+}
+.attente-titre {
+  font-size: 1.1rem;
+  text-align: center;
+}

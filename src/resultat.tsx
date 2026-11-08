@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'preact/hooks'
 import type { IngredientAnalyse, Morceau, Resultat } from './engine/analyse.ts'
 import { estPfas } from './engine/rules.ts'
+import { evaluerGravite, usageDuProduit } from './engine/gravite.ts'
 import { chargerDetails, chargerExplications, chargerRessources, type Explications, type Produit } from './donnees.ts'
 import { T, traduireFonctions } from './textes.ts'
 
@@ -11,6 +12,7 @@ const LIBELLE_SOURCE: Record<Resultat['source'], string> = {
   photo: 'photo de l’étiquette, lue sur le téléphone (Tesseract)',
   texte: 'texte saisi ou collé',
   ia: 'photo de l’étiquette, lue par Claude Haiku 5.5 (Anthropic)',
+  recherche: 'produit reconnu sur la photo, composition cherchée sur internet par Claude Haiku 5.5 (Anthropic)',
 }
 
 function classeIngredient(i: IngredientAnalyse): string {
@@ -40,6 +42,7 @@ export function EcranResultat(props: {
   onAutre: () => void
   onCorriger: () => void
   onLireEtiquette: () => void
+  onCompleter: () => void
   onSources: () => void
 }) {
   const { resultat: r, produit } = props
@@ -54,9 +57,12 @@ export function EcranResultat(props: {
       .catch(() => {})
   }, [])
 
-  const ia = r.source === 'ia'
+  const ia = r.source === 'ia' || r.source === 'recherche'
+  const rech = r.recherche
+  const gravite = evaluerGravite(r)
   const depuisBase = r.source.startsWith('base_')
-  const cosmetique = !r.aliment && (r.source === 'base_beaute' || r.partComprise >= 0.5)
+  // La mention réglementaire ne concerne que les cosmétiques (pas une poêle ni un textile)
+  const cosmetique = usageDuProduit(r) === 'cosmetique'
   const lignes = r.ingredients.filter((i) => i.reconnu || i.classement.niveau !== 'aucun')
   const signales = r.ingredients.filter((i) => i.classement.niveau !== 'aucun')
   const nbBruits = r.morceaux.filter((m) => m.type === 'bruit').length
@@ -94,6 +100,14 @@ export function EcranResultat(props: {
               <small>Code {produit.code}</small>
             </div>
           </div>
+        ) : rech ? (
+          <div class="produit">
+            <div>
+              <strong>{[rech.produit.marque, rech.produit.nom].filter(Boolean).join(' ')}</strong>
+              {rech.produit.categorie && <span>{rech.produit.categorie}</span>}
+              <small>{rech.depuisMemoire ? T.recherche.memoire : T.recherche.reconnu}</small>
+            </div>
+          </div>
         ) : (
           props.nomLu && (
             <div class="produit">
@@ -123,7 +137,55 @@ export function EcranResultat(props: {
           )}
         </section>
 
-        {r.avertissement && <p class="avertissement">{r.avertissement}</p>}
+        {/* Les contradictions ont leur propre encadré : pas de doublon */}
+        {r.avertissement && !(rech && rech.contradictions.length) && <p class="avertissement">{r.avertissement}</p>}
+        {r.listeIncomplete && (
+          <button class="bouton secondaire completer" onClick={props.onCompleter}>
+            {T.boutons.completer}
+          </button>
+        )}
+        {rech && rech.contradictions.length > 0 && (
+          <section class="alerte-contradiction">
+            <h2>{T.recherche.contradictions}</h2>
+            <ul>
+              {rech.contradictions.map((c, n) => (
+                <li key={n}>{c}</li>
+              ))}
+            </ul>
+          </section>
+        )}
+        {gravite && expl && (
+          <section class={`carte gravite ${gravite.niveau}`}>
+            <h2>
+              <span class="jauge" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+              </span>
+              {expl.gravite.niveaux[gravite.niveau].titre}
+            </h2>
+            <p>{expl.gravite.niveaux[gravite.niveau].texte}</p>
+            {gravite.raisons.length > 0 && (
+              <ul class="liste-simple">
+                {gravite.raisons.map((x, n) => (
+                  <li key={n}>{x}</li>
+                ))}
+              </ul>
+            )}
+            {gravite.familles.map((f) => (
+              <details key={f}>
+                <summary>{expl.familles[f].titre} : les risques</summary>
+                <p>{expl.familles[f].probleme}</p>
+              </details>
+            ))}
+            <h3>{T.gravite.conseils}</h3>
+            <ul class="liste-simple">
+              {expl.gravite.conseils[gravite.usage].map((c, n) => (
+                <li key={n}>{c}</li>
+              ))}
+            </ul>
+          </section>
+        )}
         {r.remarque && <p class="note">{r.remarque}</p>}
         {r.aliment && expl && <p class="note">{expl.aliment}</p>}
         {r.verdict === 'rouge' && cosmetique && expl && <p class="reglementaire">{expl.reglementaire.texte}</p>}
@@ -159,6 +221,50 @@ export function EcranResultat(props: {
           </section>
         )}
 
+        {rech && rech.indices.length > 0 && (
+          <section class="carte">
+            <h2>{T.recherche.indices}</h2>
+            <ul class="indices">
+              {rech.indices.map((i, n) => (
+                <li key={n} class={i.sens}>
+                  <span class="sens">{T.recherche.sens[i.sens]}</span> {i.fait}
+                  {i.source && (
+                    <>
+                      {' '}
+                      <a href={i.source} target="_blank" rel="noopener">
+                        ({domaine(i.source)})
+                      </a>
+                    </>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+        {rech && (
+          <section class="carte">
+            <h2>{T.recherche.sources}</h2>
+            {rech.sources.length ? (
+              <ul class="liste-simple">
+                {rech.sources.map((s, n) => (
+                  <li key={n}>
+                    <a href={s.url} target="_blank" rel="noopener">
+                      {s.titre || domaine(s.url)}
+                    </a>{' '}
+                    <small>({domaine(s.url)})</small>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p class="aide">{T.recherche.aucuneSource}</p>
+            )}
+            {rech.deduction.explication && rech.deduction.niveau !== 'inconnu' && (
+              <p class="aide">
+                {T.recherche.deduction} {rech.deduction.explication}
+              </p>
+            )}
+          </section>
+        )}
         {aDuTexte && (
           <details class="carte" open={r.verdict === 'gris'}>
             <summary>{ia ? T.resultat.texteLuIA : T.resultat.texteLu}</summary>
@@ -186,6 +292,13 @@ export function EcranResultat(props: {
               Composition : {LIBELLE_SOURCE[r.source]}
               {produit && depuisBase && ` (code ${produit.code})`}.
             </li>
+            {rech && (
+              <li>
+                {rech.depuisMemoire
+                  ? 'Résultat d’une recherche déjà faite pour ce produit (mémoire partagée), sans nouvelle recherche payante.'
+                  : `Recherche internet : ${rech.recherches} recherche${rech.recherches > 1 ? 's' : ''} (4 au plus par produit).`}
+              </li>
+            )}
             {ia ? (
               <li>
                 Claude a recopié la liste d’ingrédients et rédigé les commentaires. Le verdict PFAS ne vient pas de Claude :
@@ -439,4 +552,12 @@ function Fiche(props: { cible: Cible; expl: Explications; infos: Infos | null; o
       </div>
     </div>
   )
+}
+
+function domaine(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '')
+  } catch {
+    return url
+  }
 }

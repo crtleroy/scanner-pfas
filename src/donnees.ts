@@ -138,6 +138,10 @@ export interface Explications {
   exclu: { titre: string; texte: string }
   possible: { titre: string; texte: string }
   reglementaire: { texte: string; source: Lien }
+  gravite: {
+    niveaux: Record<'elevee' | 'moderee' | 'faible', { titre: string; texte: string }>
+    conseils: Record<'cosmetique' | 'cuisine' | 'textile' | 'emballage' | 'autre', string[]>
+  }
   aliment: string
   mention: string
   limites: string

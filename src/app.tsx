@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'preact/hooks'
 import { analyse, type Resultat, type Source } from './engine/analyse.ts'
-import { analyseIA } from './engine/ia.ts'
+import { analyseIA, analyseRecherche } from './engine/ia.ts'
 import { chargerRessources, chercherProduit, type Produit } from './donnees.ts'
 import { normaliserCode } from './codes.ts'
 import { bip, debloquerSon, demarrerCamera, lireCode, type Camera } from './scanner.ts'
 import { lireTexte, prechargerOcr, pretraiter, type Cadre } from './ocr.ts'
-import { codeAcces, enregistrerCode, ErreurRelais, lireEtiquette, preparerImage } from './relais.ts'
+import { analyserPhotos, codeAcces, enregistrerCode, ErreurRelais, memoireCodeBarres, preparerImage, rechercherProduit } from './relais.ts'
 import { T } from './textes.ts'
 import { Recadrage } from './recadrage.tsx'
 import { EcranResultat } from './resultat.tsx'
@@ -17,6 +17,7 @@ type Ecran =
   | { nom: 'chargement'; message: string }
   | { nom: 'introuvable'; code: string; erreurs: string[] }
   | { nom: 'lecture-ia'; apercu: string }
+  | { nom: 'recherche-en-cours'; apercu?: string; produit: string }
   | { nom: 'code'; image?: Blob; erreur?: boolean }
   | { nom: 'erreur-ia'; message: string; image: Blob }
   | { nom: 'recadrage'; image: HTMLImageElement }
@@ -39,6 +40,10 @@ export function App() {
   const [produit, setProduit] = useState<Produit | undefined>()
   // Consigne affichée sur l'écran caméra (« visez la liste d'ingrédients… ») et code-barres à ignorer
   const [consigne, setConsigne] = useState<{ texte: string; ignorer?: string } | undefined>()
+  // Photos du produit en cours (pour compléter une liste coupée) et code-barres inconnu des bases
+  const photos = useRef<Blob[]>([])
+  const completer = useRef(false)
+  const [codeInconnu, setCodeInconnu] = useState<string | undefined>()
   const precedent = useRef<Ecran>({ nom: 'scan' })
 
   useEffect(() => {
@@ -73,18 +78,61 @@ export function App() {
         }),
       )
     }
+    // En développement seulement : « ?demo-recherche » affiche le résultat d'une recherche internet
+    if (import.meta.env.DEV && location.search.includes('demo-recherche')) {
+      chargerRessources().then((r) =>
+        setEcran({
+          nom: 'resultat',
+          resultat: analyseRecherche(
+            {
+              produit: { marque: 'Tefal', nom: 'Ingenio Easy Cook & Clean 28 cm', categorie: 'poêle antiadhésive' },
+              composition_trouvee: true,
+              ingredients: [
+                { nom_lu: 'Revêtement antiadhésif Titanium (PTFE)', nom_normalise: 'PTFE', quantite: null, commentaire: 'revêtement antiadhésif' },
+                { nom_lu: 'Aluminium', nom_normalise: 'aluminium', quantite: null, commentaire: 'corps de la poêle' },
+              ],
+              indices: [
+                { fait: 'Tefal annonce un revêtement « sans PFOA » : le PTFE reste un PFAS.', sens: 'presence', source: 'https://www.tefal.fr/ingenio' },
+                { fait: 'Un comparateur présente la gamme comme « sans PFAS ».', sens: 'absence', source: 'https://comparateur.exemple/poeles' },
+              ],
+              sources: [
+                { titre: 'Tefal Ingenio Easy Cook & Clean', url: 'https://www.tefal.fr/ingenio' },
+                { titre: 'Comparatif des poêles', url: 'https://comparateur.exemple/poeles' },
+              ],
+              deduction_categorie: { niveau: 'probable', explication: 'Une poêle antiadhésive contient en général du PTFE, sauf revêtement céramique annoncé.' },
+              contradictions: ['Un comparateur dit la gamme « sans PFAS », alors que Tefal décrit un revêtement en PTFE.'],
+              remarque: null,
+              recherches: 3,
+            },
+            r,
+          ),
+        }),
+      )
+    }
     return () => clearTimeout(t)
   }, [])
 
   const accueil = () => {
     setProduit(undefined)
     setConsigne(undefined)
+    setCodeInconnu(undefined)
+    photos.current = []
+    completer.current = false
     setEcran({ nom: 'scan' })
   }
 
-  /** Retour à la caméra pour photographier la liste d'ingrédients du produit en cours */
+  /** Retour à la caméra pour photographier la liste d'ingrédients (ou le produit) en cours */
   const versEtiquette = (code?: string) => {
-    setConsigne({ texte: T.scan.consigneListe, ignorer: code ?? produit?.code })
+    if (code) setCodeInconnu(code)
+    completer.current = false
+    setConsigne({ texte: T.scan.consigneListe, ignorer: code ?? produit?.code ?? codeInconnu })
+    setEcran({ nom: 'scan' })
+  }
+
+  /** Liste coupée : une photo de plus, envoyée avec les précédentes */
+  const completerPhoto = () => {
+    completer.current = true
+    setConsigne({ texte: T.scan.consigneSuite, ignorer: produit?.code ?? codeInconnu })
     setEcran({ nom: 'scan' })
   }
 
@@ -105,6 +153,13 @@ export function App() {
     setEcran({ nom: 'chargement', message: T.chargement.bases })
     const { produit: p, erreurs } = await chercherProduit(code)
     if (!p) {
+      // Inconnu des bases ouvertes, mais peut-être déjà recherché d'après une photo (mémoire partagée)
+      setCodeInconnu(code)
+      const [connu, r] = await Promise.all([memoireCodeBarres(code), chargerRessources().catch(() => null)])
+      if (connu && r) {
+        setEcran({ nom: 'resultat', resultat: analyseRecherche(connu.recherche, r, true) })
+        return
+      }
       setEcran({ nom: 'introuvable', code, erreurs })
       return
     }
@@ -112,18 +167,34 @@ export function App() {
     await analyser(p.ingredients ?? '', p.base.id, p)
   }
 
-  /** Photo d'étiquette → relais → Claude → nos règles PFAS */
+  /**
+   * Photo → relais → Claude lit la liste, ou reconnaît le produit puis cherche sa composition en ligne.
+   * Le verdict PFAS vient toujours de nos règles.
+   */
   async function lireAvecClaude(image: Blob) {
     if (!codeAcces()) {
       setEcran({ nom: 'code', image })
       return
     }
+    const images = completer.current ? [...photos.current, image].slice(-4) : [image]
     const apercu = URL.createObjectURL(image)
     setEcran({ nom: 'lecture-ia', apercu })
+    const code = produit?.code ?? codeInconnu
     try {
-      const [rep, r] = await Promise.all([lireEtiquette(image), chargerRessources()])
+      const [rep, r] = await Promise.all([analyserPhotos(images, code), chargerRessources()])
+      photos.current = images
+      completer.current = false
       setConsigne(undefined)
-      setEcran({ nom: 'resultat', resultat: analyseIA(rep, r), nomLu: rep.nom_produit ?? undefined })
+      if (rep.mode === 'recherche') {
+        setEcran({ nom: 'resultat', resultat: analyseRecherche(rep.recherche, r, rep.depuis_memoire) })
+      } else if (rep.mode === 'produit' && rep.etiquette.produit?.nom) {
+        const p = rep.etiquette.produit
+        setEcran({ nom: 'recherche-en-cours', apercu, produit: [p.marque, p.nom].filter(Boolean).join(' ') })
+        const rech = await rechercherProduit({ marque: p.marque, nom: p.nom!, categorie: p.categorie }, code)
+        setEcran({ nom: 'resultat', resultat: analyseRecherche(rech.recherche, r, rech.depuis_memoire) })
+      } else {
+        setEcran({ nom: 'resultat', resultat: analyseIA(rep.etiquette, r), nomLu: rep.etiquette.nom_produit ?? undefined })
+      }
     } catch (e) {
       if (e instanceof ErreurRelais && e.type === 'code') {
         enregistrerCode(null)
@@ -214,7 +285,10 @@ export function App() {
       contenu = <EcranAttente message={ecran.etape} progression={ecran.progression} />
       break
     case 'lecture-ia':
-      contenu = <EcranAttente message={T.ia.lecture} apercu={ecran.apercu} />
+      contenu = <EcranAttente apercu={ecran.apercu} />
+      break
+    case 'recherche-en-cours':
+      contenu = <EcranAttente apercu={ecran.apercu} titre={ecran.produit} message={T.ia.recherche} />
       break
     case 'code':
       contenu = (
@@ -296,6 +370,7 @@ export function App() {
           onAutre={accueil}
           onCorriger={() => vers({ nom: 'texte', texte: ecran.texte ?? '', source: ecran.resultat.source === 'photo' ? 'photo' : 'texte' })}
           onLireEtiquette={() => versEtiquette()}
+          onCompleter={completerPhoto}
           onSources={() => vers({ nom: 'sources' })}
         />
       )
@@ -604,12 +679,13 @@ function EcranTexte(props: { texte: string; photo: boolean; onAnalyser: (t: stri
   )
 }
 
-function EcranAttente(props: { message: string; progression?: number; apercu?: string }) {
+function EcranAttente(props: { message?: string; progression?: number; apercu?: string; titre?: string }) {
   return (
     <div class="ecran attente">
       {props.apercu && <img class="apercu" src={props.apercu} alt="" />}
-      <div class="roue" aria-hidden="true" />
-      <p role="status">{props.message}</p>
+      {props.titre && <strong class="attente-titre">{props.titre}</strong>}
+      <div class="roue" aria-label="Lecture en cours" role="status" />
+      {props.message && <p role="status">{props.message}</p>}
       {props.progression !== undefined && (
         <div class="barre">
           <div style={{ width: `${Math.round(props.progression * 100)}%` }} />
