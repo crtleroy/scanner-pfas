@@ -1,0 +1,74 @@
+{
+  "general": {
+    "titre": "Qu'est-ce qu'un PFAS ?",
+    "quoi": "Les PFAS (substances per- et polyfluoroalkylées) forment une famille de plusieurs milliers de molécules dont une partie de la chaîne de carbone est entièrement entourée d'atomes de fluor.",
+    "pourquoi": "La liaison carbone-fluor est l'une des plus solides de la chimie. Elle rend ces substances résistantes à l'eau, aux graisses, à la chaleur et aux taches, d'où leur usage dans les poêles, les textiles déperlants, les emballages et certains cosmétiques.",
+    "probleme": "Cette solidité fait qu'elles ne se dégradent presque pas dans l'environnement : on les appelle « polluants éternels ». Certaines s'accumulent dans les organismes. Les deux plus étudiées, le PFOA et le PFOS, sont interdites ou très restreintes dans le monde (convention de Stockholm). Les polymères, grosses molécules, passent peu dans le corps, mais leur fabrication et leur fin de vie peuvent libérer des PFAS plus petits.",
+    "definition": "Définition retenue par l'appli : celle de l'OCDE (2021). Une substance est un PFAS si elle contient au moins un carbone saturé portant deux ou trois fluors, sans hydrogène, chlore, brome ni iode.",
+    "source": { "nom": "ECHA, Agence européenne des produits chimiques : PFAS", "url": "https://echa.europa.eu/hot-topics/perfluoroalkyl-chemicals-pfas" }
+  },
+  "familles": {
+    "fluoropolymeres": {
+      "titre": "PTFE (téflon) et polymères fluorés",
+      "quoi": "Un plastique fluoré réduit en poudre très fine. C'est le même matériau que le revêtement des poêles anti-adhésives.",
+      "pourquoi": "Il donne une texture glissante et soyeuse aux poudres, fards et fonds de teint, et améliore leur tenue.",
+      "probleme": "C'est un polymère : une grosse molécule, peu absorbée par la peau. Mais il ne se dégrade pas, et sa fabrication a longtemps fait appel au PFOA, un PFAS toxique aujourd'hui interdit."
+    },
+    "ethers_alcanes": {
+      "titre": "Éthers et alcanes perfluorés",
+      "quoi": "De petites molécules entièrement fluorées, liquides ou volatiles, comme la perfluorodécaline ou les éthers perfluorés.",
+      "pourquoi": "Elles dissolvent bien l'oxygène et s'étalent facilement. On les trouve dans des soins dits « oxygénants », des sérums, ou comme solvants qui s'évaporent après l'application.",
+      "probleme": "Très persistantes dans l'environnement. Les plus volatiles partent dans l'air. Petites molécules, elles passent plus facilement dans l'organisme que les polymères."
+    },
+    "phosphates": {
+      "titre": "Alcools fluorés et leurs phosphates",
+      "quoi": "Des molécules à queue fluorée, souvent des phosphates d'alcools fluorés (par exemple C9-15 Fluoroalcohol Phosphate).",
+      "pourquoi": "Elles repoussent l'eau et le sébum : tenue du maquillage, fini non gras, émulsions plus stables.",
+      "probleme": "En se dégradant, elles peuvent donner des acides perfluorés, de la même famille que le PFOA, très persistants et pour certains toxiques."
+    },
+    "silicones": {
+      "titre": "Silicones et silanes fluorés",
+      "quoi": "Des silicones (diméthicones) ou des silanes qui portent une chaîne fluorée.",
+      "pourquoi": "Ils forment un film qui résiste à l'eau et au sébum, et servent à enrober les pigments pour qu'ils tiennent mieux sur la peau.",
+      "probleme": "La partie fluorée ne se dégrade pas. Ces substances sont peu étudiées : leurs effets sur la santé sont mal connus."
+    },
+    "copolymeres": {
+      "titre": "Copolymères acryliques fluorés",
+      "quoi": "Des polymères synthétiques dont certains maillons portent une chaîne fluorée.",
+      "pourquoi": "Ils forment un film imperméable : mascaras et maquillage longue tenue, laques.",
+      "probleme": "Ce sont des polymères, peu absorbés, mais persistants. Ils peuvent contenir ou libérer de petits PFAS résiduels."
+    },
+    "cf3": {
+      "titre": "Molécules à groupe trifluorométhyle (CF3)",
+      "quoi": "Des molécules qui portent un groupe CF3, souvent des peptides présentés sous forme de sel de trifluoroacétate (TFA).",
+      "pourquoi": "Le TFA vient le plus souvent de la fabrication des peptides actifs, par exemple dans les soins anti-âge. Dans d'autres molécules, le CF3 renforce leur stabilité.",
+      "probleme": "Le TFA est le PFAS à la chaîne la plus courte. Très soluble et persistant, il est de plus en plus mesuré dans l'eau. Il entre dans la définition des PFAS de l'OCDE."
+    },
+    "gaz": {
+      "titre": "Gaz propulseurs fluorés",
+      "quoi": "Des gaz fluorés, comme le pentafluoropropane ou le HFC-227ea, utilisés dans les aérosols.",
+      "pourquoi": "Ils poussent le produit hors du flacon.",
+      "probleme": "Ils partent dans l'air. Plusieurs sont de puissants gaz à effet de serre, et certains se dégradent en partie en TFA, un PFAS persistant."
+    },
+    "autre": {
+      "titre": "Autre substance de la famille des PFAS",
+      "quoi": "Une molécule qui contient au moins un carbone entièrement fluoré.",
+      "pourquoi": "Le fluor apporte de la stabilité et une résistance à l'eau et aux graisses.",
+      "probleme": "Comme les autres PFAS, sa partie fluorée ne se dégrade presque pas dans l'environnement."
+    }
+  },
+  "exclu": {
+    "titre": "Contient du fluor, mais ce n'est pas un PFAS",
+    "texte": "Le fluor de cet ingrédient n'est pas porté par une chaîne de carbone entièrement fluorée : fluorure minéral, fluor sur un cycle aromatique, etc. Il n'entre pas dans la définition des PFAS. C'est le cas des fluorures des dentifrices."
+  },
+  "possible": {
+    "titre": "Ingrédient fluoré à vérifier",
+    "texte": "Le nom indique la présence de fluor, mais pas forcément d'un carbone entièrement fluoré. En principe ce n'est pas un PFAS ; l'appli le signale par prudence."
+  },
+  "reglementaire": {
+    "texte": "Les PFAS sont interdits dans les cosmétiques vendus en France depuis le 1er janvier 2026 (loi n° 2025-188 du 27 février 2025). Ce produit a donc été fabriqué avant 2026, importé, ou n'est pas conforme.",
+    "source": { "nom": "Ministère de la Transition écologique : loi du 27 février 2025", "url": "https://www.ecologie.gouv.fr/politiques-publiques/proteger-population-risques-lies-aux-pfas-loi-du-27-fevrier-2025" }
+  },
+  "mention": "Estimation à partir de la composition déclarée. Seule une analyse en laboratoire peut mesurer la présence réelle de PFAS.",
+  "limites": "L'appli lit une étiquette, elle n'analyse pas le produit. Elle ne voit pas la contamination involontaire (eau de fabrication, emballage), les traitements non déclarés, ni ce qui manque dans les bases collaboratives."
+}

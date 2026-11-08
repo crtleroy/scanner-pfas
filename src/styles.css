@@ -1,0 +1,657 @@
+:root {
+  --fond: #f5f6f7;
+  --surface: #ffffff;
+  --texte: #1f2933;
+  --texte-doux: #5b6670;
+  --bordure: #dde1e5;
+  --principal: #1f2933;
+  --principal-texte: #ffffff;
+  --rouge: #c62828;
+  --rouge-fond: #fdecea;
+  --orange: #b35900;
+  --orange-fond: #fff1e0;
+  --vert: #1b7a3a;
+  --vert-fond: #e6f4ea;
+  --gris: #5b6670;
+  --gris-fond: #eceff1;
+  --bleu-fond: #e8eef6;
+  --bleu: #33557a;
+  --rayon: 14px;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fond: #121417;
+    --surface: #1c1f23;
+    --texte: #e8eaed;
+    --texte-doux: #9aa4ad;
+    --bordure: #2e3338;
+    --principal: #e8eaed;
+    --principal-texte: #121417;
+    --rouge: #ff8a80;
+    --rouge-fond: #3a1d1b;
+    --orange: #ffb74d;
+    --orange-fond: #3a2a14;
+    --vert: #81c995;
+    --vert-fond: #17301f;
+    --gris: #aab4bd;
+    --gris-fond: #262a2f;
+    --bleu-fond: #1d2733;
+    --bleu: #9fbbe0;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--fond);
+  color: var(--texte);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 17px;
+  line-height: 1.45;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#app,
+.appli {
+  height: 100%;
+}
+
+.cache {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+h1 {
+  font-size: 1.5rem;
+  line-height: 1.2;
+  margin: 0 0 0.5rem;
+}
+h2 {
+  font-size: 1.1rem;
+  margin: 1.2rem 0 0.4rem;
+}
+h3 {
+  font-size: 0.95rem;
+  margin: 1rem 0 0.2rem;
+  color: var(--texte-doux);
+  font-weight: 600;
+}
+p {
+  margin: 0.4rem 0;
+}
+a {
+  color: inherit;
+}
+
+.ecran {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  height: 100dvh;
+  padding-top: env(safe-area-inset-top);
+}
+
+.defilement {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 1.25rem 16px 1rem;
+}
+
+.entete {
+  padding: 1rem 16px 0.5rem;
+}
+
+.aide {
+  color: var(--texte-doux);
+  font-size: 0.9rem;
+}
+
+.avertissement {
+  background: var(--orange-fond);
+  color: var(--texte);
+  border-radius: 10px;
+  padding: 0.6rem 0.8rem;
+  font-size: 0.95rem;
+}
+
+/* ---------- Boutons ---------- */
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem 16px calc(0.75rem + env(safe-area-inset-bottom));
+  background: var(--fond);
+  border-top: 1px solid var(--bordure);
+}
+
+.bouton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  padding: 0.7rem 1rem;
+  border-radius: var(--rayon);
+  border: 1px solid transparent;
+  font: inherit;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.bouton:active {
+  transform: scale(0.98);
+}
+.bouton:disabled {
+  opacity: 0.4;
+}
+.bouton.principal {
+  background: var(--principal);
+  color: var(--principal-texte);
+}
+.bouton.secondaire {
+  background: var(--surface);
+  color: var(--texte);
+  border-color: var(--bordure);
+}
+.bouton.discret {
+  background: none;
+  color: var(--texte-doux);
+  min-height: 44px;
+}
+.bouton.compact {
+  min-height: 48px;
+  padding: 0 1rem;
+}
+
+.lien,
+.lien-clair {
+  background: none;
+  border: 0;
+  padding: 0.4rem 0;
+  font: inherit;
+  font-size: 0.95rem;
+  text-decoration: underline;
+  color: inherit;
+  cursor: pointer;
+}
+
+/* ---------- Scan ---------- */
+
+.scan {
+  position: relative;
+  background: #000;
+  color: #fff;
+  padding-top: 0;
+  overflow: hidden;
+}
+.scan .video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.scan-entete {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: calc(env(safe-area-inset-top) + 0.6rem) 16px 0.6rem;
+  background: linear-gradient(rgba(0, 0, 0, 0.55), transparent);
+}
+.titre-appli {
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.lien-clair {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.9rem;
+}
+.viseur {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.viseur .cadre {
+  width: 82%;
+  max-width: 420px;
+  aspect-ratio: 2 / 1;
+  border-radius: 18px;
+  border: 3px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.35);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.viseur .cadre.lu {
+  border-color: #34c759;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.35), 0 0 0 6px rgba(52, 199, 89, 0.5);
+}
+.scan-message {
+  position: relative;
+  text-align: center;
+  margin: 0;
+  padding: 0.6rem 16px;
+  font-weight: 600;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+}
+.scan-message.fort {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 500;
+}
+.actions.sombre {
+  position: relative;
+  background: rgba(0, 0, 0, 0.6);
+  border-top: 0;
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+.actions.sombre .bouton.principal {
+  background: #fff;
+  color: #111;
+}
+.actions.sombre .bouton.secondaire {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+/* ---------- Attente ---------- */
+
+.attente {
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 16px;
+  text-align: center;
+  gap: 1rem;
+}
+.roue {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 4px solid var(--bordure);
+  border-top-color: var(--texte);
+  animation: tourne 0.9s linear infinite;
+}
+@keyframes tourne {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.barre {
+  width: min(320px, 80%);
+  height: 8px;
+  border-radius: 4px;
+  background: var(--bordure);
+  overflow: hidden;
+}
+.barre > div {
+  height: 100%;
+  background: var(--texte);
+  transition: width 0.2s;
+}
+
+/* ---------- Saisie ---------- */
+
+.champ {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 1rem 0 1.5rem;
+}
+.champ label {
+  font-weight: 600;
+}
+.champ small {
+  color: var(--texte-doux);
+}
+.ligne {
+  display: flex;
+  gap: 0.5rem;
+}
+.ligne input {
+  flex: 1;
+  min-width: 0;
+}
+input,
+textarea {
+  font: inherit;
+  font-size: 17px; /* évite le zoom automatique de Safari */
+  color: var(--texte);
+  background: var(--surface);
+  border: 1px solid var(--bordure);
+  border-radius: 12px;
+  padding: 0.7rem 0.8rem;
+  width: 100%;
+}
+textarea {
+  resize: vertical;
+}
+.texte-ocr {
+  min-height: 45vh;
+  margin-top: 0.5rem;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 15px;
+}
+.code {
+  color: var(--texte-doux);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Recadrage ---------- */
+
+.recadrage-zone {
+  position: relative;
+  flex: 1;
+  margin: 0 16px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #000;
+  touch-action: none;
+}
+.recadrage-zone img {
+  position: absolute;
+  user-select: none;
+  -webkit-user-select: none;
+  pointer-events: none;
+}
+.selection {
+  position: absolute;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+}
+.poignee {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid #1f2933;
+}
+.poignee.hg {
+  left: -12px;
+  top: -12px;
+}
+.poignee.hd {
+  right: -12px;
+  top: -12px;
+}
+.poignee.bd {
+  right: -12px;
+  bottom: -12px;
+}
+.poignee.bg {
+  left: -12px;
+  bottom: -12px;
+}
+.recadrage .actions {
+  margin-top: 0.75rem;
+}
+
+/* ---------- Résultat ---------- */
+
+.produit {
+  display: flex;
+  gap: 0.8rem;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+.produit img {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  background: #fff;
+  border-radius: 10px;
+  border: 1px solid var(--bordure);
+  flex: none;
+}
+.produit div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.produit span,
+.produit small {
+  color: var(--texte-doux);
+}
+
+.verdict {
+  border-radius: 18px;
+  padding: 1.1rem 1.1rem 0.9rem;
+  border: 1px solid transparent;
+}
+.verdict h1 {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 1.7rem;
+  margin: 0;
+}
+.pastille {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  flex: none;
+  background: currentColor;
+}
+.verdict .phrase {
+  font-size: 1.05rem;
+  font-weight: 500;
+  margin-top: 0.5rem;
+}
+.verdict .confiance {
+  font-size: 0.9rem;
+  color: var(--texte-doux);
+}
+.verdict.rouge {
+  background: var(--rouge-fond);
+}
+.verdict.rouge h1 {
+  color: var(--rouge);
+}
+.verdict.orange {
+  background: var(--orange-fond);
+}
+.verdict.orange h1 {
+  color: var(--orange);
+}
+.verdict.vert {
+  background: var(--vert-fond);
+}
+.verdict.vert h1 {
+  color: var(--vert);
+}
+.verdict.gris {
+  background: var(--gris-fond);
+}
+.verdict.gris h1 {
+  color: var(--gris);
+}
+
+.reglementaire {
+  margin: 0.8rem 0;
+  padding: 0.7rem 0.9rem;
+  border-left: 4px solid var(--rouge);
+  background: var(--surface);
+  border-radius: 0 10px 10px 0;
+  font-size: 0.95rem;
+}
+
+.carte {
+  background: var(--surface);
+  border: 1px solid var(--bordure);
+  border-radius: var(--rayon);
+  padding: 0.9rem 1rem;
+  margin: 1rem 0;
+}
+.carte h2 {
+  margin-top: 0;
+}
+details.carte summary {
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ingredients {
+  list-style: none;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.ing {
+  font: inherit;
+  font-size: 0.85rem;
+  text-align: left;
+  padding: 0.35rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid var(--bordure);
+  background: var(--fond);
+  color: var(--texte);
+  cursor: pointer;
+}
+.ing.pfas {
+  background: var(--rouge);
+  border-color: var(--rouge);
+  color: var(--surface);
+  font-weight: 700;
+}
+.ing.possible {
+  background: var(--orange-fond);
+  border-color: var(--orange);
+  color: var(--texte);
+  font-weight: 600;
+}
+.ing.exclu {
+  background: var(--bleu-fond);
+  border-color: transparent;
+  color: var(--bleu);
+}
+.ing.inconnu {
+  border-style: dashed;
+  color: var(--texte-doux);
+}
+.etiquette {
+  font-size: 0.8em;
+  font-weight: 400;
+}
+
+.liste-simple {
+  padding-left: 1.1rem;
+  margin: 0.6rem 0;
+}
+.liste-simple li {
+  margin: 0.35rem 0;
+  font-size: 0.95rem;
+}
+
+.mention {
+  font-size: 0.85rem;
+  color: var(--texte-doux);
+  border-top: 1px solid var(--bordure);
+  padding-top: 0.8rem;
+  margin-top: 1rem;
+}
+.licence {
+  font-size: 0.8rem;
+  color: var(--texte-doux);
+}
+
+/* ---------- Fiche ---------- */
+
+.voile {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: flex-end;
+  z-index: 10;
+  animation: apparait 0.15s ease-out;
+}
+.feuille {
+  width: 100%;
+  max-height: 88dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-radius: 20px 20px 0 0;
+  padding: 1.1rem 16px calc(0.9rem + env(safe-area-inset-bottom));
+  animation: monte 0.2s ease-out;
+}
+.feuille-corps {
+  overflow-y: auto;
+  margin-bottom: 0.8rem;
+}
+.feuille h2 {
+  margin-top: 0;
+  word-break: break-word;
+}
+.badge {
+  display: inline-block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.25rem 0.6rem;
+  border-radius: 8px;
+}
+.badge.pfas {
+  background: var(--rouge-fond);
+  color: var(--rouge);
+}
+.badge.possible {
+  background: var(--orange-fond);
+  color: var(--orange);
+}
+.badge.exclu {
+  background: var(--bleu-fond);
+  color: var(--bleu);
+}
+.source {
+  font-size: 0.85rem;
+  color: var(--texte-doux);
+}
+@keyframes monte {
+  from {
+    transform: translateY(40px);
+    opacity: 0.6;
+  }
+}
+@keyframes apparait {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (min-width: 640px) {
+  .defilement,
+  .actions,
+  .entete {
+    padding-left: max(16px, calc(50% - 300px));
+    padding-right: max(16px, calc(50% - 300px));
+  }
+  .feuille {
+    max-width: 600px;
+    margin: 0 auto;
+    border-radius: 20px;
+    margin-bottom: 2rem;
+  }
+}
