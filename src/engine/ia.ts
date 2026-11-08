@@ -13,7 +13,13 @@ export interface ReponseIA {
   liste_complete?: boolean
   lisibilite: 'bonne' | 'partielle' | 'mauvaise'
   nom_produit: string | null
-  produit?: { identifiable: boolean; marque: string | null; nom: string | null; categorie: string | null; confiance: string }
+  produit?: {
+    niveau: 'modele' | 'marque' | 'categorie' | 'aucun'
+    marque: string | null
+    nom: string | null
+    categorie: string | null
+    confiance: string
+  }
   ingredients: IngredientIA[]
   remarque: string | null
   texte_lu: string
@@ -21,15 +27,16 @@ export interface ReponseIA {
 
 /** Réponse « recherche » du relais (schéma Recherche de relais/src/index.ts) */
 export interface ReponseRecherche {
-  produit: { marque: string | null; nom: string; categorie: string | null }
+  produit: { marque: string | null; nom: string | null; categorie: string | null }
   composition_trouvee: boolean
   ingredients: IngredientIA[]
   sources_composition: string[]
   preuves: { niveau: 'absence_prouvee' | 'inconnu' | 'presence_prouvee'; commentaire: string; faits: FaitSource[] }
-  bases: { nom: string; resultat: string; url: string | null }[]
+  bases: { nom: string; resultat: string; url: string | null; portee?: 'produit' | 'marque' | 'categorie' }[]
   historique: FaitSource[]
   marque_dit: FaitSource[]
   autres_disent: FaitSource[]
+  autres_substances?: FaitSource[]
   deduction_categorie: { niveau: 'probable' | 'possible' | 'peu_probable' | 'inconnu'; explication: string }
   contradictions: FaitSource[]
   sources: { titre: string; url: string }[]
@@ -47,6 +54,7 @@ export function infosRecherche(rep: ReponseRecherche, depuisMemoire: boolean): I
     historique: rep.historique ?? [],
     marqueDit: rep.marque_dit ?? [],
     autresDisent: rep.autres_disent ?? [],
+    autresSubstances: rep.autres_substances ?? [],
     contradictions: rep.contradictions ?? [],
     deduction: rep.deduction_categorie,
     sources: rep.sources ?? [],
@@ -188,6 +196,8 @@ export function analyseRecherche(rep: ReponseRecherche, r: Ressources, depuisMem
   // Une présence prouvée qui nomme une substance fluorée (« revêtement PTFE ») compte comme un ingrédient
   if (infos.preuves.niveau === 'presence_prouvee') {
     for (const fait of infos.preuves.faits) {
+      // Seuls les faits sur ce produit précis comptent (pas ceux sur la marque ou le type de produit)
+      if (fait.portee && fait.portee !== 'produit') continue
       const cl = classer(fait.texte, r.listes)
       if (!estPfas(cl.niveau) || ingredients.some((i) => estPfas(i.classement.niveau) && i.classement.famille === cl.famille)) continue
       ingredients.push({ brut: fait.texte, nom: fait.texte, reconnu: false, classement: cl, commentaire: 'relevé dans une source' })

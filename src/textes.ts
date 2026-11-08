@@ -84,6 +84,13 @@ export const T = {
     erreur: 'La recherche internet n’a pas pu aboutir. Réessayez plus tard.',
     aucune: 'Produit non identifié sur la photo : pas de recherche internet. Photographiez la face avant pour qu’il soit reconnu.',
     toutesSources: 'Toutes les sources',
+    porteeProduit: 'Ce modèle',
+    porteeMarque: 'La marque',
+    porteeCategorie: 'Ce type de produit',
+    modeleInconnu: 'Modèle non identifié : informations sur la marque et ce type de produit',
+    marqueInconnue: 'Marque et modèle non identifiés : informations sur ce type de produit',
+    autresSubstances: 'Autres substances à surveiller',
+    autresSubstancesAide: 'Hors PFAS : ce que les sources disent d’autres substances préoccupantes (phtalates, bisphénols, HAP…).',
   },
   recherche: {
     reconnu: 'Reconnu d’après la photo',

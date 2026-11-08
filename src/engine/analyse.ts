@@ -12,23 +12,29 @@ export type { IngredientAnalyse, Morceau } from './lecture.ts'
 export type Source = 'base_beaute' | 'base_alimentaire' | 'base_produits' | 'photo' | 'texte' | 'ia' | 'recherche'
 
 /** Un fait relevé par la recherche, toujours avec au moins une source */
+export type Portee = 'produit' | 'marque' | 'categorie'
+
 export interface FaitSource {
   texte: string
   date: string | null
   sources: string[]
+  /** Du plus précis au plus général : ce modèle, la marque, ce type de produit */
+  portee?: Portee
 }
 
 /** Ce que la recherche internet a rapporté, pour l'affichage */
 export interface InfosRecherche {
-  produit: { marque: string | null; nom: string; categorie: string | null }
+  produit: { marque: string | null; nom: string | null; categorie: string | null }
   compositionTrouvee: boolean
   sourcesComposition: string[]
   /** absence_prouvee : analyse ou certification indépendante ; presence_prouvee : analyse, rappel, liste officielle */
   preuves: { niveau: 'absence_prouvee' | 'inconnu' | 'presence_prouvee'; commentaire: string; faits: FaitSource[] }
-  bases: { nom: string; resultat: string; url: string | null }[]
+  bases: { nom: string; resultat: string; url: string | null; portee?: Portee }[]
   historique: FaitSource[]
   marqueDit: FaitSource[]
   autresDisent: FaitSource[]
+  /** Substances préoccupantes hors PFAS (phtalates, bisphénols…) */
+  autresSubstances: FaitSource[]
   contradictions: FaitSource[]
   deduction: { niveau: 'probable' | 'possible' | 'peu_probable' | 'inconnu'; explication: string }
   sources: { titre: string; url: string }[]

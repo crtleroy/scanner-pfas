@@ -88,7 +88,7 @@ export async function analyserPhotos(images: Blob[], codeBarres?: string): Promi
 
 /** Produit reconnu → recherche internet (ou mémoire partagée) */
 export function rechercherProduit(
-  produit: { marque: string | null; nom: string; categorie: string | null },
+  produit: { marque: string | null; nom: string | null; categorie: string | null; niveau: string },
   codeBarres?: string,
   listeConnue = false,
 ): Promise<ReponseRecherchee> {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'preact/hooks'
-import type { FaitSource, IngredientAnalyse, Morceau, Resultat } from './engine/analyse.ts'
+import type { FaitSource, IngredientAnalyse, Morceau, Portee, Resultat } from './engine/analyse.ts'
 import { estPfas } from './engine/rules.ts'
 import { evaluerGravite, usageDuProduit } from './engine/gravite.ts'
 import { chargerDetails, chargerExplications, chargerRessources, type Explications, type Produit } from './donnees.ts'
@@ -48,12 +48,21 @@ function Sources(props: { urls: string[] }) {
   )
 }
 
-/** Faits sourcés d'un encart ; « rien trouvé » si la liste est vide */
-function Faits(props: { faits: FaitSource[] }) {
+const ORDRE_PORTEES: Portee[] = ['produit', 'marque', 'categorie']
+
+/** Sous-titre d'un étage : ce modèle, la marque, ce type de produit */
+function titrePortee(portee: Portee, marque: string | null, categorie: string | null): string {
+  if (portee === 'produit') return T.encarts.porteeProduit
+  if (portee === 'marque') return marque ? `${T.encarts.porteeMarque} ${marque}` : T.encarts.porteeMarque
+  return categorie ? `${T.encarts.porteeCategorie} : ${categorie}` : T.encarts.porteeCategorie
+}
+
+/** Faits sourcés d'un encart, du plus précis au plus général ; « rien trouvé » si la liste est vide */
+function Faits(props: { faits: FaitSource[]; marque?: string | null; categorie?: string | null; sansEtages?: boolean }) {
   if (!props.faits.length) return <p class="aide">{T.encarts.rienTrouve}</p>
-  return (
+  const liste = (faits: FaitSource[]) => (
     <ul class="faits">
-      {props.faits.map((f, n) => (
+      {faits.map((f, n) => (
         <li key={n}>
           {f.date && <strong class="date">{f.date} · </strong>}
           {f.texte} <Sources urls={f.sources} />
@@ -61,7 +70,24 @@ function Faits(props: { faits: FaitSource[] }) {
       ))}
     </ul>
   )
+  if (props.sansEtages) return liste(props.faits)
+  return (
+    <>
+      {ORDRE_PORTEES.map((portee) => {
+        const faits = props.faits.filter((f) => (f.portee ?? 'produit') === portee)
+        if (!faits.length) return null
+        return (
+          <div key={portee} class="etage">
+            <h3>{titrePortee(portee, props.marque ?? null, props.categorie ?? null)}</h3>
+            {liste(faits)}
+          </div>
+        )
+      })}
+    </>
+  )
 }
+
+const majuscule = (t: string) => (t ? t[0].toUpperCase() + t.slice(1) : t)
 
 export function EcranResultat(props: {
   resultat: Resultat
@@ -103,10 +129,14 @@ export function EcranResultat(props: {
 
   // En-tête : ta photo, sinon celle de la base ; nom le plus précis disponible
   const image = props.photo ?? produit?.image
-  const nom = rech
-    ? [rech.produit.marque, rech.produit.nom].filter(Boolean).join(' ')
+  const rp = rech?.produit
+  const nom = rp
+    ? rp.nom
+      ? [rp.marque, rp.nom].filter(Boolean).join(' ')
+      : majuscule([rp.categorie, rp.marque].filter(Boolean).join(' '))
     : (produit?.nom ?? props.nomLu ?? (r.source === 'texte' ? 'Liste saisie' : 'Produit photographié'))
-  const sousTitre = rech?.produit.categorie ?? produit?.marque ?? null
+  const sousTitre = rp ? (rp.nom ? rp.categorie : rp.marque ? T.encarts.modeleInconnu : T.encarts.marqueInconnue) : (produit?.marque ?? null)
+  const etages = { marque: rp?.marque ?? null, categorie: rp?.categorie ?? null }
 
   /** Commentaire d'une ligne : l'état PFAS d'abord (nos règles), puis ce qu'est l'ingrédient */
   function commentaire(i: IngredientAnalyse) {
@@ -250,7 +280,7 @@ export function EcranResultat(props: {
         {rech && rech.contradictions.length > 0 && (
           <section class="alerte-contradiction">
             <h2>{T.recherche.contradictions}</h2>
-            <Faits faits={rech.contradictions} />
+            <Faits faits={rech.contradictions} sansEtages />
           </section>
         )}
 
@@ -273,7 +303,7 @@ export function EcranResultat(props: {
                 {T.encarts.niveauxPreuve[rech.preuves.niveau]}
               </h2>
               {rech.preuves.commentaire && <p>{rech.preuves.commentaire}</p>}
-              {rech.preuves.faits.length > 0 && <Faits faits={rech.preuves.faits} />}
+              {rech.preuves.faits.length > 0 && <Faits faits={rech.preuves.faits} {...etages} />}
             </section>
 
             <section class="carte">
@@ -293,7 +323,11 @@ export function EcranResultat(props: {
                 )}
                 {rech.bases.map((b, n) => (
                   <li key={n}>
-                    <strong>{b.nom}</strong> : {b.resultat} {b.url && <Sources urls={[b.url]} />}
+                    <strong>{b.nom}</strong>
+                    {b.portee && b.portee !== 'produit' && (
+                      <small> ({titrePortee(b.portee, etages.marque, etages.categorie).toLowerCase()})</small>
+                    )}{' '}
+                    : {b.resultat} {b.url && <Sources urls={[b.url]} />}
                   </li>
                 ))}
               </ul>
@@ -302,17 +336,23 @@ export function EcranResultat(props: {
 
             <section class="carte">
               <h2>{T.encarts.historique}</h2>
-              <Faits faits={rech.historique} />
+              <Faits faits={rech.historique} {...etages} />
             </section>
 
             <section class="carte">
               <h2>{T.encarts.marque}</h2>
-              <Faits faits={rech.marqueDit} />
+              <Faits faits={rech.marqueDit} {...etages} />
             </section>
 
             <section class="carte">
               <h2>{T.encarts.autres}</h2>
-              <Faits faits={rech.autresDisent} />
+              <Faits faits={rech.autresDisent} {...etages} />
+            </section>
+
+            <section class="carte">
+              <h2>{T.encarts.autresSubstances}</h2>
+              <p class="aide">{T.encarts.autresSubstancesAide}</p>
+              <Faits faits={rech.autresSubstances} {...etages} />
             </section>
 
             {rech.sources.length > 0 && (

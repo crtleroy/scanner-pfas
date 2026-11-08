@@ -1180,3 +1180,14 @@ details.carte summary {
   border-width: 3px;
   flex: none;
 }
+
+/* ---------- Étages : ce modèle, la marque, ce type de produit (v6) ---------- */
+.etage + .etage {
+  margin-top: 0.6rem;
+}
+.etage h3 {
+  margin: 0.6rem 0 0;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}

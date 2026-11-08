@@ -27,7 +27,7 @@ const ORIGINES = ['https://crtleroy.github.io', 'http://localhost:5173']
 const TAILLE_MAX = 8 * 1024 * 1024 // base64 par image, soit environ 6 Mo
 const IMAGES_MAX = 4
 const DUREE_MEMOIRE = 180 * 24 * 3600 // secondes
-const VERSION_MEMOIRE = 'v2' // change quand la forme d'une recherche change : les anciennes sont ignorées
+const VERSION_MEMOIRE = 'v3' // change quand la forme d'une recherche change : les anciennes sont ignorées
 
 // ---------- Schémas des réponses ----------
 
@@ -45,7 +45,7 @@ const Etiquette = z.object({
   lisibilite: z.enum(['bonne', 'partielle', 'mauvaise']),
   nom_produit: z.string().nullable(),
   produit: z.object({
-    identifiable: z.boolean(),
+    niveau: z.enum(['modele', 'marque', 'categorie', 'aucun']),
     marque: z.string().nullable(),
     nom: z.string().nullable(),
     categorie: z.string().nullable(),
@@ -62,10 +62,12 @@ const Fait = z.object({
   texte: z.string(),
   date: z.string().nullable(),
   sources: z.array(z.string()),
+  /** du plus précis au plus général : ce modèle, la marque, ce type de produit */
+  portee: z.enum(['produit', 'marque', 'categorie']),
 })
 
 const Recherche = z.object({
-  produit: z.object({ marque: z.string().nullable(), nom: z.string(), categorie: z.string().nullable() }),
+  produit: z.object({ marque: z.string().nullable(), nom: z.string().nullable(), categorie: z.string().nullable() }),
   composition_trouvee: z.boolean(),
   ingredients: z.array(Ingredient),
   sources_composition: z.array(z.string()),
@@ -74,10 +76,13 @@ const Recherche = z.object({
     commentaire: z.string(),
     faits: z.array(Fait),
   }),
-  bases: z.array(z.object({ nom: z.string(), resultat: z.string(), url: z.string().nullable() })),
+  bases: z.array(
+    z.object({ nom: z.string(), resultat: z.string(), url: z.string().nullable(), portee: z.enum(['produit', 'marque', 'categorie']) }),
+  ),
   historique: z.array(Fait),
   marque_dit: z.array(Fait),
   autres_disent: z.array(Fait),
+  autres_substances: z.array(Fait),
   deduction_categorie: z.object({
     niveau: z.enum(['probable', 'possible', 'peu_probable', 'inconnu']),
     explication: z.string(),
@@ -102,28 +107,41 @@ const CONSIGNES_PHOTO = `Tu regardes une ou plusieurs photos d'un même produit 
 - lisibilite : "partielle" ou "mauvaise" si une partie est floue, coupée ou cachée.
 - texte_lu : le texte brut de la liste, tel que tu le lis.
 
-2. Produit : identifie toujours le produit si tu le peux, même quand la liste est visible, pour qu'on puisse chercher des informations en ligne. identifiable = true si la marque et le nom (ou un modèle précis) sont lisibles ou reconnaissables avec une bonne certitude. marque, nom (le plus précis possible : gamme, teinte, référence), categorie (en français : « vernis à ongles », « poêle antiadhésive », « gel douche »). confiance : "haute" si la marque et le nom sont écrits lisiblement, "moyenne" si tu les reconnais sans les lire entièrement, "faible" sinon.
+2. Produit : identifie toujours le produit, même quand la liste est visible, du plus précis au plus général, pour qu'on puisse chercher des informations en ligne.
+- categorie : le type de produit en français, toujours si tu le reconnais (« bouillotte », « lentilles de contact », « vernis à ongles », « poêle antiadhésive »).
+- marque : si un nom de marque est visible, même petit (« Elephant »), sinon null.
+- nom : le modèle précis (gamme, teinte, référence) seulement s'il est lisible, sinon null.
+- niveau : "modele" si marque et modèle sont connus ; "marque" si la marque et le type de produit sont connus sans le modèle ; "categorie" si seul le type de produit est connu ; "aucun" si tu ne reconnais même pas le type de produit.
+- confiance : "haute" si c'est lisible, "moyenne" si tu le reconnais sans le lire entièrement, "faible" sinon.
 
 3. Ignore le reste de l'étiquette (mode d'emploi, valeurs nutritionnelles, adresse, slogans), mais sers-t'en pour type_produit.
 4. S'il n'y a pas de liste d'ingrédients, liste_trouvee = false, ingredients = [], et dis en une phrase dans remarque ce que montre la photo.`
 
-const CONSIGNES_RECHERCHE = (max: number, listeConnue: boolean) => `Tu es l'assistant de recherche d'une appli qui repère les PFAS (substances per- et polyfluoroalkylées). On te donne un produit reconnu sur une photo. Tu fais au plus ${max} recherches internet en tout ; répartis-les sur les sujets ci-dessous.
+const CONSIGNES_RECHERCHE = (max: number, listeConnue: boolean) => `Tu es l'assistant de recherche d'une appli qui repère les PFAS (substances per- et polyfluoroalkylées). On te donne un produit reconnu sur une photo, plus ou moins précisément : modèle exact, ou seulement la marque et le type de produit, ou seulement le type de produit. Tu fais au plus ${max} recherches internet en tout.
+
+Va du plus précis au plus général, à trois étages, et indique l'étage de chaque fait dans portee :
+- "produit" : ce modèle précis (si on le connaît ; sinon, essaie de le retrouver avec la marque et le type de produit, par exemple « bouillotte Elephant ») ;
+- "marque" : la marque et ses autres produits ;
+- "categorie" : ce type de produit en général (« les bouillottes », « les lentilles de contact »).
+Si le modèle est inconnu, consacre tes recherches à la marque et au type de produit ; si seul le type de produit est connu, tout porte sur lui. Ne prétends jamais qu'un fait sur la marque ou le type de produit vaut pour ce modèle précis.
 
 Sujets :
-1. Composition${listeConnue ? ' : déjà lue sur la photo, ne la cherche pas (laisse ingredients vide, composition_trouvee = false)' : ' de CE produit : liste INCI pour un cosmétique (site de la marque, Sephora, Nocibé, INCI Beauty, Open Beauty Facts…), ingrédients pour un aliment, matériaux et revêtements pour un objet (poêle, textile, emballage)'}.
-2. Preuves et certifications : une analyse en laboratoire ou une certification indépendante qui porte explicitement sur les PFAS. niveau = "absence_prouvee" seulement si une telle preuve montre l'absence de PFAS ; "presence_prouvee" si une analyse, un rappel, une liste officielle ou la composition déclarée montre un PFAS dans ce produit ; "inconnu" sinon. Une simple déclaration de la marque n'est PAS une preuve : dis-le dans commentaire.
-3. Bases de données : ce que disent INCI Beauty, Open Beauty Facts, EWG Skin Deep, QuelCosmetic, Safety Gate (rappels UE), les listes officielles… pour ce produit. Une ligne par base consultée, avec son adresse.
-4. Historique : faits datés sur la marque et le produit vis-à-vis des PFAS (reformulations, études, rappels, procès, pollution d'une usine, engagements passés), même pour d'autres produits de la marque. Des faits, pas des accusations.
-5. Ce que dit la marque : ses déclarations publiques sur les PFAS (politique, engagements, mentions « sans PFAS », « sans PFOA »…).
-6. Ce que disent les autres : tests indépendants (UFC-Que Choisir, 60 Millions de consommateurs, Générations Futures, EWG, Mamavation…), associations, presse, plaintes.
+1. Composition${listeConnue ? ' : déjà lue sur la photo, ne la cherche pas (laisse ingredients vide, composition_trouvee = false)' : " de ce produit : liste INCI pour un cosmétique (site de la marque, Sephora, Nocibé, INCI Beauty, Open Beauty Facts…), ingrédients pour un aliment, matériaux et revêtements pour un objet. composition_trouvee = true seulement pour la composition de ce produit précis (ou de ce modèle retrouvé)"}.
+2. Preuves et certifications sur les PFAS : analyse en laboratoire ou certification indépendante qui porte explicitement sur les PFAS. niveau = "absence_prouvee" seulement si une telle preuve montre l'absence de PFAS dans ce produit ; "presence_prouvee" si une analyse, un rappel, une liste officielle ou la composition déclarée montre un PFAS dans ce produit ; "inconnu" sinon. Une simple déclaration de la marque n'est PAS une preuve : dis-le dans commentaire. Une analyse sur ce type de produit en général va dans les faits (portee "categorie") sans changer le niveau.
+3. Bases de données : ce que disent INCI Beauty, Open Beauty Facts, EWG Skin Deep, QuelCosmetic, Safety Gate (rappels UE), les listes officielles… Une ligne par base consultée, avec son adresse et sa portée.
+4. Historique vis-à-vis des PFAS : faits datés (reformulations, études, rappels, procès, pollution d'une usine, engagements passés). Des faits, pas des accusations.
+5. Ce que dit la marque sur les PFAS (politique, engagements, mentions « sans PFAS », « sans PFOA »…).
+6. Ce que disent les autres : tests indépendants (UFC-Que Choisir, 60 Millions de consommateurs, Générations Futures, EWG, Mamavation…), associations, autorités, presse, plaintes.
+7. Autres substances à surveiller (hors PFAS) pour ce produit ou ce type de produit : phtalates, bisphénols, HAP, nitrosamines, métaux lourds, allergènes… avec ce que disent les sources (par exemple pour une bouillotte en plastique ou en caoutchouc chauffée). Seulement si une source en parle.
 
 Règles :
-- N'invente rien. Chaque fait (preuves, historique, marque_dit, autres_disent, contradictions) doit citer au moins une adresse de page réellement trouvée par tes recherches dans sources. Sans source, n'écris pas le fait.
-- Donne dès que possible des chiffres, des noms de molécules (PTFE, PFOA, PFHxA…), des familles et des quantités (« 1 200 ng/g de fluor organique »), et la date (année au moins).
-- Ne recopie que des ingrédients trouvés pour ce produit précis. Si tu ne trouves que la composition d'un produit voisin, dis-le dans remarque et mets composition_trouvee = false. Pour un objet, liste les matériaux et revêtements comme ingrédients (« PTFE », commentaire « revêtement antiadhésif »). nom_normalise : nom INCI pour un cosmétique, nom de la substance ou du matériau sinon. commentaire : 12 mots au plus.
+- Les PFAS d'abord : la majorité de tes recherches porte sur les PFAS ; les autres substances viennent en dernier.
+- N'invente rien. Chaque fait (preuves, historique, marque_dit, autres_disent, autres_substances, contradictions) doit citer au moins une adresse de page réellement trouvée par tes recherches dans sources. Sans source, n'écris pas le fait.
+- Donne dès que possible des chiffres, des noms de molécules (PTFE, PFOA, PFHxA, DEHP…), des familles et des quantités, et la date (année au moins).
+- Pour un objet, liste les matériaux et revêtements comme ingrédients (« PTFE », commentaire « revêtement antiadhésif »). nom_normalise : nom INCI pour un cosmétique, nom de la substance ou du matériau sinon. commentaire : 12 mots au plus.
 - « Sans PFOA » ne veut pas dire « sans PFAS » : le PTFE est un PFAS.
-- deduction_categorie : ce que la nature du produit laisse penser (une poêle antiadhésive contient en général du PTFE sauf revêtement céramique annoncé ; un vernis à ongles en contient rarement…). C'est un raisonnement, pas un fait sourcé.
-- contradictions : chaque désaccord entre sources (déclaration « sans PFAS » contredite par un test ou un ingrédient fluoré, compositions différentes…), avec les sources des deux côtés. Liste vide s'il n'y en a pas.
+- deduction_categorie : ce que la nature du produit laisse penser pour les PFAS (une poêle antiadhésive contient en général du PTFE sauf revêtement céramique annoncé ; une bouillotte en caoutchouc ou en PVC n'en contient en général pas ; certaines lentilles de contact contiennent des silicones fluorés…). C'est un raisonnement, pas un fait sourcé.
+- contradictions : chaque désaccord entre sources, avec les sources des deux côtés. Liste vide s'il n'y en a pas.
 - Les listes peuvent rester vides : c'est mieux qu'un fait douteux.
 - sources : toutes les pages utilisées, avec leur titre et leur adresse.
 - Écris en français.
@@ -136,17 +154,22 @@ function reponse(corps: unknown, statut: number, entetes: Record<string, string>
   return new Response(JSON.stringify(corps), { status: statut, headers: { ...entetes, 'Content-Type': 'application/json; charset=utf-8' } })
 }
 
-/** Clé de mémoire d'un produit : marque + nom, sans accents ni ponctuation. */
-function cleProduit(marque: string | null, nom: string): string {
-  return (
-    `${VERSION_MEMOIRE}p:` +
-    `${marque ?? ''} ${nom}`
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[̀-ͯ]/g, '')
-      .replace(/[^a-z0-9]+/g, ' ')
-      .trim()
-  )
+const simplifier = (t: string) =>
+  t
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+
+/**
+ * Clé de mémoire selon ce qu'on connaît : le modèle (marque + nom), la marque et le type de produit,
+ * ou le type de produit seul (alors partagée par tous les produits de ce type).
+ */
+function cleProduit(p: { marque: string | null; nom: string | null; categorie: string | null }): string {
+  if (p.nom) return `${VERSION_MEMOIRE}p:${simplifier(`${p.marque ?? ''} ${p.nom}`)}`
+  if (p.marque) return `${VERSION_MEMOIRE}m:${simplifier(`${p.marque} ${p.categorie ?? ''}`)}`
+  return `${VERSION_MEMOIRE}k:${simplifier(p.categorie ?? '')}`
 }
 const cleCode = (code: string) => `${VERSION_MEMOIRE}c:${code}`
 
@@ -180,7 +203,7 @@ const EXEMPLE_ETIQUETTE: Etiquette = {
   liste_complete: true,
   lisibilite: 'bonne',
   nom_produit: 'Anti-moustique (réponse simulée)',
-  produit: { identifiable: true, marque: 'Exemple', nom: 'Anti-moustique', categorie: 'répulsif', confiance: 'haute' },
+  produit: { niveau: 'modele', marque: 'Exemple', nom: 'Anti-moustique', categorie: 'répulsif', confiance: 'haute' },
   ingredients: [
     {
       nom_lu: 'IR3535 (ethyl butylacetylaminopropionate)',
@@ -200,10 +223,11 @@ const EXEMPLE_RECHERCHE: Recherche = {
   ingredients: [],
   sources_composition: [],
   preuves: { niveau: 'inconnu', commentaire: 'Aucune analyse indépendante trouvée ; la marque seule ne vaut pas preuve.', faits: [] },
-  bases: [{ nom: 'Open Beauty Facts', resultat: 'Produit absent de la base.', url: null }],
-  historique: [{ texte: 'Fait historique simulé.', date: '2024', sources: [SRC] }],
-  marque_dit: [{ texte: 'La marque déclare ses produits « sans PFAS » (simulé).', date: null, sources: [SRC] }],
-  autres_disent: [],
+  bases: [{ nom: 'Open Beauty Facts', resultat: 'Produit absent de la base.', url: SRC, portee: 'produit' }],
+  historique: [{ texte: 'Fait historique simulé sur la marque.', date: '2024', sources: [SRC], portee: 'marque' }],
+  marque_dit: [{ texte: 'La marque déclare ses produits « sans PFAS » (simulé).', date: null, sources: [SRC], portee: 'marque' }],
+  autres_disent: [{ texte: 'Une étude simulée sur ce type de produit.', date: '2023', sources: [SRC], portee: 'categorie' }],
+  autres_substances: [{ texte: 'Phtalates signalés dans certains produits de ce type (simulé).', date: '2022', sources: [SRC], portee: 'categorie' }],
   deduction_categorie: { niveau: 'peu_probable', explication: 'Ce type de produit en contient rarement.' },
   contradictions: [],
   sources: [{ titre: 'Page simulée', url: SRC }],
@@ -245,7 +269,7 @@ async function analyserPhotos(client: Anthropic, env: Env, images: { data: strin
 async function rechercherProduit(
   client: Anthropic,
   env: Env,
-  produit: Recherche['produit'],
+  produit: Recherche['produit'] & { niveau: string },
   listeConnue: boolean,
 ): Promise<Recherche & { recherches: number }> {
   const max = Math.max(1, Math.min(10, Number(env.RECHERCHES_MAX) || 6))
@@ -268,7 +292,7 @@ async function rechercherProduit(
   const messages: Anthropic.MessageParam[] = [
     {
       role: 'user',
-      content: `Produit reconnu sur la photo : marque « ${produit.marque ?? 'inconnue'} », nom « ${produit.nom} », catégorie « ${produit.categorie ?? 'inconnue'} ».`,
+      content: `Produit reconnu sur la photo (niveau « ${produit.niveau} ») : marque « ${produit.marque ?? 'inconnue'} », modèle « ${produit.nom ?? 'inconnu'} », type de produit « ${produit.categorie ?? 'inconnu'} ».`,
     },
   ]
   const trouvees = new Map<string, string>() // url → titre, pages réellement renvoyées par la recherche
@@ -314,7 +338,7 @@ async function rechercherProduit(
     messages: [
       {
         role: 'user',
-        content: `Produit : ${produit.marque ?? ''} ${produit.nom} (${produit.categorie ?? ''}).\n\nCompte rendu de recherche :\n${texte || '(aucun)'}\n\nPages trouvées :\n${pages || '(aucune)'}\n\nMets ce compte rendu au format demandé.`,
+        content: `Produit : ${produit.marque ?? ''} ${produit.nom ?? ''} (${produit.categorie ?? ''}).\n\nCompte rendu de recherche :\n${texte || '(aucun)'}\n\nPages trouvées :\n${pages || '(aucune)'}\n\nMets ce compte rendu au format demandé.`,
       },
     ],
   })
@@ -342,6 +366,7 @@ function nettoyer(r: Recherche, trouvees: Map<string, string>): Recherche {
     historique: faits(r.historique),
     marque_dit: faits(r.marque_dit),
     autres_disent: faits(r.autres_disent),
+    autres_substances: faits(r.autres_substances),
     contradictions: faits(r.contradictions),
   }
 }
@@ -369,7 +394,7 @@ export default {
       image?: unknown
       images?: unknown
       type?: unknown
-      produit?: { marque?: unknown; nom?: unknown; categorie?: unknown }
+      produit?: { marque?: unknown; nom?: unknown; categorie?: unknown; niveau?: unknown }
       code_barres?: unknown
       liste_connue?: unknown
     }
@@ -392,21 +417,22 @@ export default {
 
       // Recherche internet sur un produit reconnu
       if (action === 'rechercher') {
-        const nom = typeof corps.produit?.nom === 'string' ? corps.produit.nom.slice(0, 200) : ''
-        if (!nom) return reponse({ erreur: 'requete' }, 400, cors)
+        const texte = (v: unknown, n: number) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, n) : null)
         const produit = {
-          marque: typeof corps.produit?.marque === 'string' ? corps.produit.marque.slice(0, 100) : null,
-          nom,
-          categorie: typeof corps.produit?.categorie === 'string' ? corps.produit.categorie.slice(0, 100) : null,
+          marque: texte(corps.produit?.marque, 100),
+          nom: texte(corps.produit?.nom, 200),
+          categorie: texte(corps.produit?.categorie, 100),
+          niveau: texte(corps.produit?.niveau, 20) ?? 'modele',
         }
-        const cle = cleProduit(produit.marque, produit.nom)
+        if (!produit.nom && !produit.categorie && !produit.marque) return reponse({ erreur: 'requete' }, 400, cors)
+        const cle = cleProduit(produit)
         const connue = await lireMemoire(env, cle)
         if (connue) {
           if (codeBarres) await ecrireMemoire(env, [cleCode(codeBarres)], connue)
           return reponse({ mode: 'recherche', recherche: connue, depuis_memoire: true }, 200, cors)
         }
         const recherche = factice
-          ? { ...EXEMPLE_RECHERCHE, produit, recherches: 0 }
+          ? { ...EXEMPLE_RECHERCHE, produit: { marque: produit.marque, nom: produit.nom, categorie: produit.categorie }, recherches: 0 }
           : await rechercherProduit(client, env, produit, corps.liste_connue === true)
         await ecrireMemoire(env, codeBarres ? [cle, cleCode(codeBarres)] : [cle], recherche)
         return reponse({ mode: 'recherche', recherche, depuis_memoire: false }, 200, cors)
@@ -422,9 +448,10 @@ export default {
 
       const etiquette = factice ? EXEMPLE_ETIQUETTE : await analyserPhotos(client, env, images)
       const p = etiquette.produit
-      const identifie = p.identifiable && !!p.nom && p.confiance !== 'faible'
+      // Dès que le type de produit (ou la marque) est connu, une recherche est possible
+      const identifie = p.niveau !== 'aucun' && !!(p.categorie || p.marque || p.nom)
       // Produit déjà recherché : la recherche part avec la réponse, sans nouvelle recherche payante
-      const connue = identifie ? await lireMemoire(env, cleProduit(p.marque, p.nom!)) : null
+      const connue = identifie ? await lireMemoire(env, cleProduit(p)) : null
       const memoire = connue ? { recherche: connue, depuis_memoire: true } : {}
       if (etiquette.liste_trouvee && etiquette.ingredients.length) return reponse({ mode: 'liste', etiquette, ...memoire }, 200, cors)
       if (identifie) return reponse({ mode: 'produit', etiquette, ...memoire }, 200, cors)

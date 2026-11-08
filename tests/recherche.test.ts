@@ -22,12 +22,18 @@ const vide: ReponseRecherche = {
   historique: [],
   marque_dit: [],
   autres_disent: [],
+  autres_substances: [],
   deduction_categorie: { niveau: 'inconnu', explication: '' },
   contradictions: [],
   sources: [],
   remarque: null,
 }
-const fait = (texte: string) => ({ texte, date: null, sources: ['https://exemple.fr'] })
+const fait = (texte: string, portee: 'produit' | 'marque' | 'categorie' = 'produit') => ({
+  texte,
+  date: null,
+  sources: ['https://exemple.fr'],
+  portee,
+})
 
 describe('Recherche internet sur un produit reconnu', () => {
   it('poêle Tefal : PTFE trouvé, rouge, gravité modérée, conseils de cuisine', () => {
@@ -69,6 +75,30 @@ describe('Recherche internet sur un produit reconnu', () => {
       r,
     )
     expect(res.verdict).toBe('vert')
+  })
+  it('un fait sur le type de produit en général ne vaut pas preuve pour ce produit', () => {
+    const res = analyseRecherche(
+      {
+        ...vide,
+        produit: { marque: null, nom: null, categorie: 'poêle' },
+        preuves: { niveau: 'presence_prouvee', commentaire: '', faits: [fait('Les poêles antiadhésives contiennent du PTFE', 'categorie')] },
+      },
+      r,
+    )
+    expect(res.verdict).not.toBe('rouge')
+  })
+  it('bouillotte de marque sans modèle : les autres substances sont gardées', () => {
+    const res = analyseRecherche(
+      {
+        ...vide,
+        produit: { marque: 'Elephant', nom: null, categorie: 'bouillotte' },
+        deduction_categorie: { niveau: 'peu_probable', explication: 'Une bouillotte en caoutchouc n’en contient en général pas.' },
+        autres_substances: [fait('Des HAP ont été trouvés dans des bouillottes en caoutchouc.', 'categorie')],
+      },
+      r,
+    )
+    expect(res.recherche?.autresSubstances).toHaveLength(1)
+    expect(res.verdict).toBe('gris')
   })
   it('vernis sans composition trouvée : déduction de la catégorie', () => {
     const res = analyseRecherche(

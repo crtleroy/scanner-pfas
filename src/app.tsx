@@ -99,30 +99,27 @@ export function App() {
           nom: 'resultat',
           resultat: analyseRecherche(
             {
-              produit: { marque: 'Tefal', nom: 'Ingenio Easy Cook & Clean 28 cm', categorie: 'poêle antiadhésive' },
-              composition_trouvee: true,
-              ingredients: [
-                { nom_lu: 'Revêtement antiadhésif Titanium (PTFE)', nom_normalise: 'PTFE', quantite: null, commentaire: 'revêtement antiadhésif' },
-                { nom_lu: 'Aluminium', nom_normalise: 'aluminium', quantite: null, commentaire: 'corps de la poêle' },
-              ],
-              sources_composition: src(1),
+              produit: { marque: 'Elephant', nom: null, categorie: 'bouillotte' },
+              composition_trouvee: false,
+              ingredients: [],
+              sources_composition: [],
               preuves: {
-                niveau: 'presence_prouvee',
-                commentaire: 'La composition déclarée par la marque contient du PTFE ; aucune certification « sans PFAS ».',
-                faits: [{ texte: 'Fiche technique : revêtement à base de PTFE (polytétrafluoroéthylène).', date: '2025', sources: src(1) }],
+                niveau: 'inconnu',
+                commentaire: 'Aucune analyse ni certification sur les PFAS trouvée pour les bouillottes de la marque.',
+                faits: [{ texte: 'Une analyse de 20 bouillottes n’a trouvé aucun composé fluoré.', date: '2023', sources: src(1), portee: 'categorie' }],
               },
-              bases: [
-                { nom: 'Open Products Facts', resultat: 'Produit présent, composition non renseignée.', url: src(2)[0] },
-                { nom: 'Safety Gate (rappels UE)', resultat: 'Aucun rappel pour ce produit.', url: null },
+              bases: [{ nom: 'Safety Gate (rappels UE)', resultat: '3 rappels de bouillottes pour phtalates depuis 2020.', url: src(2)[0], portee: 'categorie' }],
+              historique: [{ texte: 'La marque vend des bouillottes en caoutchouc naturel depuis 1985.', date: '1985', sources: src(3), portee: 'marque' }],
+              marque_dit: [],
+              autres_disent: [{ texte: 'Une association conseille les bouillottes en caoutchouc naturel plutôt qu’en PVC.', date: '2024', sources: src(4), portee: 'categorie' }],
+              autres_substances: [
+                { texte: 'Des HAP ont été mesurés dans des bouillottes en caoutchouc noir bon marché.', date: '2022', sources: src(2), portee: 'categorie' },
               ],
-              historique: [{ texte: 'Le PFOA, utilisé pour fabriquer le PTFE, a été abandonné par le fabricant en 2012.', date: '2012', sources: src(3) }],
-              marque_dit: [{ texte: 'La marque annonce des revêtements « sans PFOA ».', date: null, sources: src(1) }],
-              autres_disent: [{ texte: 'Une association rappelle que « sans PFOA » ne veut pas dire sans PFAS.', date: '2024', sources: src(4) }],
-              deduction_categorie: { niveau: 'probable', explication: 'Une poêle antiadhésive contient en général du PTFE.' },
-              contradictions: [{ texte: 'Un comparateur dit la gamme « sans PFAS », alors que la marque décrit un revêtement en PTFE.', date: null, sources: [...src(1), ...src(4)] }],
+              deduction_categorie: { niveau: 'peu_probable', explication: 'Une bouillotte en caoutchouc ou en PVC ne contient en général pas de PFAS.' },
+              contradictions: [],
               sources: [1, 2, 3, 4].map((n) => ({ titre: `Source ${n}`, url: src(n)[0] })),
               remarque: null,
-              recherches: 5,
+              recherches: 6,
             },
             r,
           ),
@@ -207,7 +204,7 @@ export function App() {
       }
       setEcran({ nom: 'resultat', resultat: res, rechercheEtat: 'en_cours' })
       try {
-        const rech = await rechercherProduit({ marque: p.marque ?? null, nom: p.nom, categorie: null }, code, !!p.ingredients)
+        const rech = await rechercherProduit({ marque: p.marque ?? null, nom: p.nom, categorie: null, niveau: 'modele' }, code, !!p.ingredients)
         if (jeton.current === n) setEcran({ nom: 'resultat', resultat: ajouterRecherche(res, rech.recherche, rech.depuis_memoire) })
       } catch {
         if (jeton.current === n) setEcran({ nom: 'resultat', resultat: res, rechercheEtat: 'erreur' })
@@ -259,10 +256,11 @@ export function App() {
       else if (pBase?.ingredients)
         res = analyse(pBase.ingredients, { source: pBase.base.id, categories: pBase.categories, nomProduit: pBase.nom }, r)
       const pc = et.produit
+      // Du plus précis au plus général : produit de la base, sinon ce que Claude a reconnu (modèle, marque ou type)
       const identite = pBase?.nom
-        ? { marque: pBase.marque ?? null, nom: pBase.nom, categorie: pc?.categorie ?? null }
-        : pc?.identifiable && pc.nom && pc.confiance !== 'faible'
-          ? { marque: pc.marque, nom: pc.nom, categorie: pc.categorie }
+        ? { marque: pBase.marque ?? null, nom: pBase.nom, categorie: pc?.categorie ?? null, niveau: 'modele' }
+        : pc && pc.niveau !== 'aucun' && (pc.categorie || pc.marque || pc.nom)
+          ? { marque: pc.marque, nom: pc.nom, categorie: pc.categorie, niveau: pc.niveau }
           : null
       const extra = { photo: photoProduit.current, nomLu: et.nom_produit ?? undefined }
 
@@ -277,7 +275,12 @@ export function App() {
         return
       }
       if (res) setEcran({ nom: 'resultat', resultat: res, ...extra, rechercheEtat: 'en_cours' })
-      else setEcran({ nom: 'recherche-en-cours', apercu: photoProduit.current, produit: [identite.marque, identite.nom].filter(Boolean).join(' ') })
+      else
+        setEcran({
+          nom: 'recherche-en-cours',
+          apercu: photoProduit.current,
+          produit: [identite.categorie && !identite.nom ? identite.categorie : null, identite.marque, identite.nom].filter(Boolean).join(' '),
+        })
       try {
         const rech = await rechercherProduit(identite, code, !!res)
         if (jeton.current !== n) return
