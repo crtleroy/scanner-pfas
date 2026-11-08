@@ -43,5 +43,5 @@ Web app mobile (PWA) qui dit si un produit contient probablement des PFAS, à pa
 - Tesseract et le scanner de texte de l'iPhone ont été jugés insuffisants ou malcommodes. L'écran caméra a un bouton « Lire l'étiquette » qui prend l'image de la caméra et l'envoie au relais `relais/` (Cloudflare Worker), qui la fait lire par **Claude Haiku 5.5** (environ 0,05 centime par photo).
 - Claude recopie la liste (nom lu, nom normalisé, quantité, commentaire) dans un format imposé ; **le verdict PFAS reste calculé par nos règles** (`src/engine/ia.ts`), jamais par Claude.
 - Résultat en tableau Ingrédient | Quantité | Commentaire.
-- Le relais exige un code d'accès (secret `CODE_ACCES`) et garde la clé Anthropic (secret `ANTHROPIC_API_KEY`). En local : `relais/.dev.vars` avec `MODE=factice` pour une réponse simulée, et `.env.local` avec `VITE_RELAIS_URL=http://127.0.0.1:8787`. `?demo-ia` (développement seulement) affiche un résultat de démonstration.
+- Le relais exige un code d'accès (secret `CODE_ACCES`) et garde la clé Anthropic (secret `ANTHROPIC_API_KEY`). En local : `relais/.dev.vars` avec `MODE=factice` pour une réponse simulée, et `.env.development.local` avec `VITE_RELAIS_URL=http://127.0.0.1:8787`. `?demo-ia` (développement seulement) affiche un résultat de démonstration.
 - La lecture sur le téléphone (Tesseract) reste en secours hors ligne.
